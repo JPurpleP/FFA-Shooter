@@ -136,6 +136,6 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 ## Online setup (one time)
 1. Open the project in Unity 6000.6.5f1 and sign in with your Unity account.
 2. **Edit > Project Settings > Services**: pick your organization and **Create project ID** (or link an existing one).
-3. At [cloud.unity.com](https://cloud.unity.com), open that project and enable **Relay** (free tier: 50 concurrent players/month avg).
+3. At [cloud.unity.com](https://cloud.unity.com), open that project and enable **Relay** (it has a free tier).
 4. Rebuild. Until this is done, Online hosting shows "Online play isn't set up yet" — LAN / Direct IP still works.
 - Code: `Assets/Scripts/RelayConnect.cs` (anonymous sign-in, allocation, join codes, error messages); `GameUI.Host/Join`.
