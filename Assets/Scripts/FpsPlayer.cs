@@ -93,6 +93,14 @@ public class FpsPlayer : NetworkBehaviour
     public bool AimbotActive => IsSpawned && ServerNow < AimbotUntil.Value;
     public float EspSecondsLeft => EspActive ? (float)(EspUntil.Value - ServerNow) : 0f;
     public float AimbotSecondsLeft => AimbotActive ? (float)(AimbotUntil.Value - ServerNow) : 0f;
+    // Spawn protection: can't be hurt for a few seconds after spawning, until you move or fire.
+    public const float SpawnProtectSeconds = 3f;
+    public readonly NetworkVariable<bool> Protected = new(); // server written; off when it runs out or is broken
+    public bool SpawnProtected => IsSpawned && !IsDead && Protected.Value;
+    public float SpawnProtectLeft => SpawnProtected ? Mathf.Max(0f, SpawnProtectSeconds - (Time.time - protectStartedLocal)) : 0f;
+    bool protectionDropSent;
+    float protectEndsAt;       // server: Time.time protection runs out
+    float protectStartedLocal; // every client: when it switched on (for the countdown)
     public BodyModel Body => body;
     /// <summary>Where the aimbot points: the middle of the head hitbox.</summary>
     public Vector3 AimPoint => head.position + head.rotation * new Vector3(0f, 0.1f, 0f);
@@ -201,7 +209,7 @@ public class FpsPlayer : NetworkBehaviour
     // Remote players are drawn slightly in the past, interpolating between received snapshots (smooth at any tick rate).
     struct NetSnap { public float t; public Vector3 pos, look; }
     readonly List<NetSnap> snaps = new();
-    const float InterpDelay = 0.1f;
+    public const float InterpDelay = 0.1f;
     Stance appliedShape = (Stance)255;
 
     // Grappling hook (owner state; anchor is mirrored in netGrapple for everyone's rope visuals)
@@ -282,6 +290,8 @@ public class FpsPlayer : NetworkBehaviour
         if (IsServer)
             InLobby.Value = MatchRules.LobbyOpen;
         InLobby.OnValueChanged += OnLobbyChanged;
+        Protected.OnValueChanged += (_, on) => { if (on) protectStartedLocal = Time.time; };
+        if (Protected.Value) protectStartedLocal = Time.time;
         Ready.OnValueChanged += (_, now) => { if (IsServer && InLobby.Value) Debug.Log($"[FFA] {DisplayName} is {(now ? "ready" : "not ready")}"); };
 
         if (IsOwner)
@@ -333,6 +343,7 @@ public class FpsPlayer : NetworkBehaviour
     void Update()
     {
         if (!IsSpawned) return;
+        if (IsServer && Protected.Value && Time.time >= protectEndsAt) Protected.Value = false;
         if (IsOwner) OwnerUpdate();
         else RemoteUpdate();
 
@@ -365,6 +376,12 @@ public class FpsPlayer : NetworkBehaviour
         }
         var input = brain != null ? brain.Think(this) : ReadHumanInput();
         bool alive = !IsDead;
+        if (alive && !protectionDropSent && SpawnProtected
+            && (input.Move.sqrMagnitude > 0.01f || input.Jump || input.FireHeld || input.FirePressed || input.Grapple || input.GrenadeHeld))
+        {
+            protectionDropSent = true; // moving or attacking ends spawn protection
+            DropProtectionRpc();
+        }
         if (InDuel)
         {
             // Golden duel: fists only. No guns, grenades, hook, pickups or aiming.
@@ -756,7 +773,7 @@ public class FpsPlayer : NetworkBehaviour
         if (d == null) return;
         if (IsLocalHuman)
         {
-            // Hip â†’ sights, plus kick and a little movement bob.
+            // Hip → sights, plus kick and a little movement bob.
             float dt = Mathf.Max(Time.deltaTime, 0.0001f);
             float ads = AdsEased;
             float free = 1f - ads; // bob, sway, tilt and dips all fade out at full ADS so the sights stay dead on the centre
@@ -968,9 +985,17 @@ public class FpsPlayer : NetworkBehaviour
     // ------------------------------------------------------------------ server: shooting and damage
 
     [Rpc(SendTo.Server)]
+    void DropProtectionRpc()
+    {
+        if (Protected.Value) Debug.Log($"[FFA] {DisplayName}: spawn protection ended (moved)");
+        Protected.Value = false;
+    }
+
+    [Rpc(SendTo.Server)]
     void ShootRpc(Vector3 origin, Vector3 direction, float spread, int seed, int weapon)
     {
         if (IsDead || InDuel || MatchRules.IsMatchOver) return;
+        Protected.Value = false; // firing ends spawn protection
         var def = WeaponDefs.Get(weapon);
         if (def == null || !HasWeapon((WeaponId)weapon)) return;
         if (Time.time < serverNextFire) return;
@@ -997,6 +1022,7 @@ public class FpsPlayer : NetworkBehaviour
         foreach (var kv in damage)
         {
             var v = kv.Value;
+            if (kv.Key.SpawnProtected) continue;
             // The golden gun doesn't hurt: it drags both of you into a fist fight to the death.
             if (def.Id == WeaponId.GoldenDeagle && DuelManager.TryStart(this, kv.Key))
             {
@@ -1034,6 +1060,7 @@ public class FpsPlayer : NetworkBehaviour
     public bool TakeDamage(int amount, FpsPlayer attacker, DeathInfo info)
     {
         if (!IsServer || IsDead || InLobby.Value) return false;
+        if (SpawnProtected && amount < 9999) return false; // falls and executions still count
         if (DevSettings.GodMode && !botOnServer && OwnerClientId == NetworkManager.ServerClientId && amount < 9999) return false;
         if (botOnServer && brain != null && brain.invulnerable && amount < 9999) return false;
         Health.Value = Mathf.Max(0, Health.Value - amount);
@@ -1054,7 +1081,8 @@ public class FpsPlayer : NetworkBehaviour
             HasGrapple.Value = false;
             WeaponPickup.Spawn(WeaponId.GrappleHook, 0, 0, dropAt - transform.forward * 0.5f, null, 30f);
         }
-        DeathRpc(info, attacker != null && attacker != this ? new FixedString32Bytes(attacker.DisplayName) : default);
+        bool byOther = attacker != null && attacker != this;
+        DeathRpc(info, byOther ? new FixedString32Bytes(attacker.DisplayName) : default, byOther ? attacker.NetworkObjectId : ulong.MaxValue);
         MatchRules.OnPlayerKilled(attacker, this, info);
 
         if (respawnRoutine != null) StopCoroutine(respawnRoutine);
@@ -1102,7 +1130,7 @@ public class FpsPlayer : NetworkBehaviour
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    void DeathRpc(DeathInfo info, FixedString32Bytes killer)
+    void DeathRpc(DeathInfo info, FixedString32Bytes killer, ulong killerId)
     {
         Transform corpse = body != null ? Gore.SpawnCorpse(body, info) : null;
         ApplyAliveState();
@@ -1118,6 +1146,8 @@ public class FpsPlayer : NetworkBehaviour
             var gore = GorePlan.For(info).Describe();
             LastDeathDetail = info.Fell ? "You fell to your death" :
                 $"{(def != null ? def.Name : "")}{(info.HitPart == BodyModel.Part.Head ? " · headshot" : "")}{(gore != null ? " · " + gore.ToLower() : "")}";
+            if (!InDuel && !info.Fell && NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(killerId, out var killerObj))
+                KillCam.Play(this, killerObj.GetComponent<FpsPlayer>(), info.WeaponId, corpse);
         }
     }
 
@@ -1139,6 +1169,9 @@ public class FpsPlayer : NetworkBehaviour
             respawnRoutine = null;
         }
         Health.Value = MaxHealth;
+        Protected.Value = true;
+        protectEndsAt = Time.time + SpawnProtectSeconds;
+        protectStartedLocal = Time.time;
         Vector3 position;
         float spawnYaw;
         if (brain != null && brain.fixedSpawn.HasValue)
@@ -1167,6 +1200,7 @@ public class FpsPlayer : NetworkBehaviour
         controller.enabled = false;
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, newYaw, 0f));
         yaw = newYaw;
+        protectionDropSent = false;
         pitch = recoilOffset = bloom = adsT = verticalVelocity = lean = 0f;
         grappling = false;
         momentum = Vector3.zero;
@@ -2064,6 +2098,14 @@ public class FpsPlayer : NetworkBehaviour
         viewModelCamera.enabled = inWorld;
         audioListener.enabled = inWorld;
         if (fpArms != null) fpArms.gameObject.SetActive(inWorld);
+    }
+
+    /// <summary>The killcam looks through this player's (past) eyes: keep their live body out of the shot.</summary>
+    public void SetHiddenForKillcam(bool hidden)
+    {
+        if (!hidden) { ApplyAliveState(); return; }
+        if (body != null) body.SetVisible(false);
+        if (weaponRig != null) weaponRig.gameObject.SetActive(false);
     }
 
     void ApplyAliveState()

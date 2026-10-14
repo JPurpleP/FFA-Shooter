@@ -27,6 +27,10 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
 - **Lobby.** Hosting or joining puts you in a waiting lobby (player list, join code). Everyone presses **Ready Up**; the
   host's **Start Match** unlocks once every player is ready. No bots in normal games (the F1 dev panel can still add them).
   Players who join mid-match drop straight in.
+- **Spawn protection:** for 3 s after spawning you can't be hurt (and can't be pulled into a golden duel). Moving, jumping,
+  firing, hooking or throwing ends it early. A "PROTECTED" tag shows over protected enemies in your line of sight.
+- **Killcam:** when someone kills you, the last ~3 seconds are replayed through their eyes (with their gun), with you
+  walking your last steps, before you respawn.
 - First to 25 kills wins; after 8 seconds everyone goes back to the lobby to ready up for the next match. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
 - Controls: WASD · Shift sprint · Space jump · LMB fire · RMB aim (scope on the Barrett) · **Q/E lean** · R reload ·
   F pick up / swap · 1/2 or mouse wheel to switch · Tab scores · Esc menu · **F1 dev panel**

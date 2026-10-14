@@ -535,8 +535,9 @@ public class BodyModel : MonoBehaviour
             {
                 list.Add(Visual(u, PrimitiveType.Capsule, new Vector3(0f, -su.Length * 0.25f, 0f),
                     new Vector3(su.Radius * 2.4f, su.Length * 0.32f, su.Radius * 2.4f), sk.TankTop ? skin : top, sk.TankTop ? null : shirtMat)); // short sleeve (bare for a tank top)
-                list.Add(Visual(u, PrimitiveType.Cylinder, new Vector3(0f, -su.Length * 0.38f, 0f),
-                    new Vector3(su.Radius * 2.5f, 0.012f, su.Radius * 2.5f), accent)); // armband in the player's color
+                if (!sk.NoArmbands)
+                    list.Add(Visual(u, PrimitiveType.Cylinder, new Vector3(0f, -su.Length * 0.38f, 0f),
+                        new Vector3(su.Radius * 2.5f, 0.012f, su.Radius * 2.5f), accent)); // armband in the player's color
                 if (sk.WehrmachtGear && origin.x < 0f)
                 {
                     // Parody armband on the left arm: red band, white roundel with a black spider.

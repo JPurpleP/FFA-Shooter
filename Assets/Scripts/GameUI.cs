@@ -146,6 +146,32 @@ public partial class GameUI : MonoBehaviour
         }
     }
 
+    static readonly Color ProtectColor = new(0.45f, 0.85f, 1f);
+
+    /// <summary>Your own spawn-protection timer, and a tag over protected enemies you can actually see.</summary>
+    void DrawSpawnProtection(FpsPlayer me, float w, float h, float scale)
+    {
+        if (me.SpawnProtected)
+        {
+            float left = me.SpawnProtectLeft;
+            Shadowed(new Rect(0, h * 0.62f, w, 26), $"<b>SPAWN PROTECTION</b>  {left:0.0}s", new GUIStyle(centerLabel) { fontSize = 18 }, ProtectColor);
+            Shadowed(new Rect(0, h * 0.62f + 24, w, 20), "Moving or firing ends it", new GUIStyle(centerLabel) { fontSize = 13 }, new Color(1f, 1f, 1f, 0.7f));
+            Fill(new Rect(w / 2 - 80, h * 0.62f + 48, 160 * left / FpsPlayer.SpawnProtectSeconds, 3), ProtectColor);
+        }
+        var cam = me.playerCamera;
+        if (cam == null) return;
+        var tag = new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold };
+        foreach (var p in FpsPlayer.All)
+        {
+            if (!me.IsEnemyOf(p) || !p.SpawnProtected) continue;
+            Vector3 top = p.AimPoint + Vector3.up * 0.35f;
+            Vector3 sp = cam.WorldToScreenPoint(top);
+            if (sp.z < 0.1f || sp.z > 80f) continue;
+            if (Physics.Linecast(cam.transform.position, p.AimPoint, 1, QueryTriggerInteraction.Ignore)) continue; // behind cover
+            Shadowed(new Rect(sp.x / scale - 60, (Screen.height - sp.y) / scale - 10, 120, 20), "PROTECTED", tag, ProtectColor);
+        }
+    }
+
     static void DrawLine(Vector2 a, Vector2 b, float width, Color color)
     {
         Vector2 d = b - a;
@@ -576,9 +602,29 @@ public partial class GameUI : MonoBehaviour
             DrawHud(w, h);
     }
 
+    /// <summary>Replay through the killer's eyes: letterbox bars, a title and who / what killed you (replaces the HUD).</summary>
+    void DrawKillCamOverlay(float w, float h)
+    {
+        Fill(new Rect(0, 0, w, 54), new Color(0f, 0f, 0f, 0.75f));
+        Fill(new Rect(0, h - 54, w, 54), new Color(0f, 0f, 0f, 0.75f));
+        Shadowed(new Rect(30, 10, 300, 36), "<b>KILLCAM</b>", new GUIStyle(label) { fontSize = 26 }, new Color(1f, 0.3f, 0.3f));
+        Shadowed(new Rect(0, h - 46, w, 36), $"<b>{KillCam.KillerName}</b>   <size=14>{KillCam.WeaponName}</size>",
+            new GUIStyle(centerLabel) { fontSize = 20 }, Color.white);
+        Fill(new Rect(0, h - 3, w * KillCam.Progress, 3), new Color(1f, 0.3f, 0.3f, 0.9f));
+        float c2 = w / 2, cy2 = h / 2; // killer's crosshair
+        var ch = new Color(1f, 1f, 1f, 0.8f);
+        Fill(new Rect(c2 - 10, cy2 - 1, 7, 2), ch); Fill(new Rect(c2 + 3, cy2 - 1, 7, 2), ch);
+        Fill(new Rect(c2 - 1, cy2 - 10, 2, 7), ch); Fill(new Rect(c2 - 1, cy2 + 3, 2, 7), ch);
+    }
+
     void DrawHud(float w, float h)
     {
         var me = FpsPlayer.Local;
+        if (me.IsDead && KillCam.Active)
+        {
+            DrawKillCamOverlay(w, h);
+            return;
+        }
         float t = Time.time;
         float scale = Screen.height / 720f;
         var def = me.InDuel ? WeaponDefs.Get(WeaponId.Fists) : me.CurrentDef;
@@ -606,6 +652,7 @@ public partial class GameUI : MonoBehaviour
             Fill(new Rect(0, 0, w, h), new Color(0.6f, 0f, 0f, 0.12f + 0.08f * Mathf.Sin(t * 5f)));
 
         if (me.EspActive && !me.IsDead) DrawEsp(me, w, h, scale);
+        if (!me.IsDead) DrawSpawnProtection(me, w, h, scale);
 
         // Crosshair (fades out while aiming down sights) + hit marker
         float cx = w / 2, cy = h / 2;

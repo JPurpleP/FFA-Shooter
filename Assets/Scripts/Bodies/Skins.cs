@@ -25,6 +25,7 @@ public class SkinDef
     public Color HatColor = new(0.95f, 0.78f, 0.1f);
     public bool Bald;
     public bool FreedomPrint, HiVisStripes, PlateCarrier, ChefButtons, Backpack;
+    public bool NoArmbands;             // plain sleeves, no player-color armbands
     public bool TunicButtons;           // single column of brass buttons and a brass belt plate
     public bool FlagPrint;              // big Confederate flag printed on the chest
     public bool WehrmachtGear;          // M36 tunic details, Y-straps, belt, K98 pouches, bread bag, gas-mask canister
@@ -53,7 +54,7 @@ public static class Skins
         new SkinDef
         {
             Name = "Original", Description = "Plain white tee, dark jeans, short black hair.",
-            Shirt = new Color(0.95f, 0.95f, 0.94f),
+            Shirt = new Color(0.95f, 0.95f, 0.94f), NoArmbands = true,
         },
         new SkinDef
         {
