@@ -101,6 +101,12 @@ public class FpsPlayer : NetworkBehaviour
     public readonly NetworkVariable<bool> HasGrapple = new();
     /// <summary>0 = not duelling, else golden-duel ring index + 1 (server written).</summary>
     public readonly NetworkVariable<byte> DuelSlot = new();
+    /// <summary>Waiting in the pre-match lobby: out of the world, can't be hit (server written).</summary>
+    public readonly NetworkVariable<bool> InLobby = new();
+    /// <summary>Readied up in the lobby (bots are always ready).</summary>
+    public readonly NetworkVariable<bool> Ready = new(false,
+        NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    public bool IsHostPlayer => !botOnServer && !IsBot.Value && OwnerClientId == NetworkManager.ServerClientId;
     /// <summary>The host's map, fixed when the object is created; joining clients switch to it on spawn.</summary>
     public readonly NetworkVariable<byte> MapId = new(MapCatalog.CurrentByte);
     public readonly NetworkVariable<byte> SkinId = new(0,
@@ -273,9 +279,14 @@ public class FpsPlayer : NetworkBehaviour
 
         if (IsServer && botOnServer)
             IsBot.Value = true;
+        if (IsServer)
+            InLobby.Value = MatchRules.LobbyOpen;
+        InLobby.OnValueChanged += OnLobbyChanged;
+        Ready.OnValueChanged += (_, now) => { if (IsServer && InLobby.Value) Debug.Log($"[FFA] {DisplayName} is {(now ? "ready" : "not ready")}"); };
 
         if (IsOwner)
         {
+            Ready.Value = botOnServer;
             PlayerName.Value = new FixedString32Bytes(botOnServer ? brain.botName : GameUI.LocalPlayerName);
             inv = Inventory.Default;
             yaw = transform.eulerAngles.y;
@@ -298,10 +309,11 @@ public class FpsPlayer : NetworkBehaviour
             audioListener.enabled = false;
         }
 
-        if (IsServer)
+        if (IsServer && !InLobby.Value)
             Respawn();
 
         ApplyAliveState();
+        ApplyLobbyView();
         lastPosition = transform.position;
         Debug.Log($"[FFA] {(botOnServer ? "Bot" : "Player")} {DisplayName} spawned (owner={IsOwner}, server={IsServer})");
     }
@@ -310,6 +322,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         if (IsServer && !NetworkManager.ShutdownInProgress) DuelManager.Abort(this);
         DuelSlot.OnValueChanged -= OnDuelSlotChanged;
+        InLobby.OnValueChanged -= OnLobbyChanged;
         All.Remove(this);
         Health.OnValueChanged -= OnHealthChanged;
         if (Local == this) Local = null;
@@ -345,6 +358,11 @@ public class FpsPlayer : NetworkBehaviour
 
     void OwnerUpdate()
     {
+        if (InLobby.Value)
+        {
+            if (grappling) ReleaseGrapple(false);
+            return;
+        }
         var input = brain != null ? brain.Think(this) : ReadHumanInput();
         bool alive = !IsDead;
         if (InDuel)
@@ -1015,7 +1033,7 @@ public class FpsPlayer : NetworkBehaviour
     /// <summary>Server only. Returns true if this damage killed the player.</summary>
     public bool TakeDamage(int amount, FpsPlayer attacker, DeathInfo info)
     {
-        if (!IsServer || IsDead) return false;
+        if (!IsServer || IsDead || InLobby.Value) return false;
         if (DevSettings.GodMode && !botOnServer && OwnerClientId == NetworkManager.ServerClientId && amount < 9999) return false;
         if (botOnServer && brain != null && brain.invulnerable && amount < 9999) return false;
         Health.Value = Mathf.Max(0, Health.Value - amount);
@@ -1099,7 +1117,7 @@ public class FpsPlayer : NetworkBehaviour
             var def = WeaponDefs.Get(info.WeaponId);
             var gore = GorePlan.For(info).Describe();
             LastDeathDetail = info.Fell ? "You fell to your death" :
-                $"{(def != null ? def.Name : "")}{(info.HitPart == BodyModel.Part.Head ? " Â· headshot" : "")}{(gore != null ? " Â· " + gore.ToLower() : "")}";
+                $"{(def != null ? def.Name : "")}{(info.HitPart == BodyModel.Part.Head ? " · headshot" : "")}{(gore != null ? " · " + gore.ToLower() : "")}";
         }
     }
 
@@ -1297,7 +1315,7 @@ public class FpsPlayer : NetworkBehaviour
     }
 
     /// <summary>Enemy (or duel opponent) worth targeting: alive, in the same arena context.</summary>
-    public bool IsEnemyOf(FpsPlayer other) => other != null && other != this && other.IsSpawned && !other.IsDead && other.DuelSlot.Value == DuelSlot.Value;
+    public bool IsEnemyOf(FpsPlayer other) => other != null && other != this && other.IsSpawned && !other.IsDead && !other.InLobby.Value && other.DuelSlot.Value == DuelSlot.Value;
 
     FpsPlayer aimbotLock; // owner: who the aimbot is locked onto this frame
     bool AimbotLocked => aimbotLock != null && AimbotActive && !aimbotLock.IsDead;
@@ -2007,9 +2025,50 @@ public class FpsPlayer : NetworkBehaviour
         if (IsLocalHuman && current < previous) GameUI.FlashDamage(previous - current);
     }
 
+    // ------------------------------------------------------------------ lobby
+
+    /// <summary>Server: pull this player out of the world into the waiting lobby (match over / host back in lobby).</summary>
+    public void ServerEnterLobby()
+    {
+        DuelManager.Abort(this);
+        if (InDuel) DuelSlot.Value = 0;
+        if (respawnRoutine != null)
+        {
+            StopCoroutine(respawnRoutine);
+            respawnRoutine = null;
+        }
+        Health.Value = MaxHealth;
+        InLobby.Value = true;
+    }
+
+    /// <summary>Server: drop into the match at a spawn point with a fresh loadout.</summary>
+    public void ServerLeaveLobby()
+    {
+        InLobby.Value = false;
+        Respawn();
+    }
+
+    void OnLobbyChanged(bool previous, bool now)
+    {
+        if (IsOwner && now) Ready.Value = botOnServer; // everyone readies up again for the next match
+        ApplyAliveState();
+        ApplyLobbyView();
+    }
+
+    /// <summary>The local player's cameras and ears are off while waiting (the menu camera flies over the map).</summary>
+    void ApplyLobbyView()
+    {
+        if (!IsLocalHuman) return;
+        bool inWorld = !InLobby.Value;
+        playerCamera.enabled = inWorld;
+        viewModelCamera.enabled = inWorld;
+        audioListener.enabled = inWorld;
+        if (fpArms != null) fpArms.gameObject.SetActive(inWorld);
+    }
+
     void ApplyAliveState()
     {
-        bool alive = !IsDead;
+        bool alive = !IsDead && !InLobby.Value;
         controller.enabled = alive;
         if (headHitbox != null) headHitbox.enabled = alive;
         if (body != null) body.SetVisible(alive);

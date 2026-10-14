@@ -35,7 +35,7 @@ public class MapCatalog : MonoBehaviour
     /// <summary>The active map as a network value (0 before anything is applied).</summary>
     public static byte CurrentByte => (byte)Mathf.Max(0, Current);
     public static int Count => I != null && I.maps != null ? I.maps.Length : 1;
-    public static string NameOf(int id) => I != null && I.maps != null && id >= 0 && id < I.maps.Length ? I.maps[id].name : "Kirktown";
+    public static string NameOf(int id) => I != null && I.maps != null && id >= 0 && id < I.maps.Length ? I.maps[id].name : "Fluketown";
     public static string DescriptionOf(int id) => I != null && I.maps != null && id >= 0 && id < I.maps.Length ? I.maps[id].description : "";
 
     void Awake() => I = this;

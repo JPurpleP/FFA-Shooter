@@ -152,15 +152,12 @@ public partial class GameUI
                 MapCatalog.Apply(i);
             }
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 170, col - 36, 22), MapCatalog.DescriptionOf(GameSettings.Map), smallStyle);
-        GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 196, 200, 20), "FILL WITH BOTS", smallStyle);
-        int bots = Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(hostRect.x + 18, hostRect.y + 224, col - 90, 20), GameSettings.HostBots, 0, 10));
-        GUI.Label(new Rect(hostRect.x + col - 66, hostRect.y + 214, 48, 30), bots.ToString(), valueStyle);
-        if (bots != GameSettings.HostBots) { GameSettings.HostBots = bots; GameSettings.Save(); }
+        GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 200, col - 36, 44), "Everyone waits in the lobby and readies up; you start the match.", bodyStyle);
         GUI.enabled = !connecting;
         if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + boxH - 70, col - 36, 50), connecting ? "CONNECTING…" : "HOST GAME", bigButtonStyle))
         {
             LocalPlayerName = GameSettings.Name;
-            Host(GameSettings.HostOnline, GameSettings.HostBots);
+            Host(GameSettings.HostOnline, lobby: true);
         }
         GUI.enabled = true;
 
@@ -192,12 +189,103 @@ public partial class GameUI
             GUI.Label(new Rect(r.x, y + 26, r.width, 44), connecting ? status : $"<color=#ff8a80>{status}</color>", bodyStyle);
     }
 
-    System.Collections.IEnumerator SpawnHostBots(int count)
+    // ------------------------------------------------------------------ Lobby
+
+    float lobbyBusyUntil; // brief guard so a double click can't start twice / toggle ready straight back off
+    float lobbyCodeCopiedTime = -10f;
+
+    /// <summary>Waiting room after hosting / joining: player list with ready states; the host starts the match.</summary>
+    void DrawLobby(float w, float h)
     {
-        while (FpsPlayer.Local == null) yield return null;
-        yield return new WaitForSeconds(0.5f);
-        for (int i = 0; i < count; i++)
-            FpsPlayer.SpawnBot(BotMode.Fighter, $"Bot {i + 1}");
+        EnsureMenuStyles();
+        if (preview != null) preview.Show(GameSettings.Skin, false);
+        var me = FpsPlayer.Local;
+        bool isHost = Net.IsServer;
+
+        Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.35f));
+        float pw = Mathf.Min(w - 80, 640), ph = h - 120;
+        var panel = new Rect((w - pw) / 2f, 60, pw, ph);
+        Fill(panel, new Color(0.04f, 0.05f, 0.07f, 0.9f));
+        Fill(new Rect(panel.x, panel.y, panel.width, 3), Accent);
+        float x = panel.x + 30, iw = pw - 60, y = panel.y + 22;
+
+        GUI.Label(new Rect(x, y, iw, 40), "LOBBY", h2Style);
+        GUI.Label(new Rect(x, y + 6, iw, 30), $"{MapCatalog.NameOf(MapCatalog.Current).ToUpper()}  ·  FIRST TO {MatchRules.FragLimit}",
+            new GUIStyle(subtitleStyle) { alignment = TextAnchor.MiddleRight });
+        y += 50;
+
+        // Join code for inviting friends (online games).
+        if (RelayConnect.Code != "")
+        {
+            GUI.Label(new Rect(x, y, 140, 34), "JOIN CODE", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleLeft });
+            GUI.Label(new Rect(x + 96, y - 2, 160, 38), $"<b>{RelayConnect.Code}</b>", new GUIStyle(h3Style) { fontSize = 26, richText = true });
+            var copyStyle = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 14 };
+            if (GUI.Button(new Rect(x + 250, y, 110, 34), Time.unscaledTime - lobbyCodeCopiedTime < 1.5f ? "COPIED!" : "COPY", copyStyle))
+            {
+                GUIUtility.systemCopyBuffer = RelayConnect.Code;
+                lobbyCodeCopiedTime = Time.unscaledTime;
+            }
+            y += 46;
+        }
+        if (!string.IsNullOrEmpty(winner))
+        {
+            GUI.Label(new Rect(x, y, iw, 24), $"Last match won by <b>{winner}</b>", bodyStyle);
+            y += 30;
+        }
+
+        // Players.
+        GUI.Label(new Rect(x, y, 300, 20), $"PLAYERS ({FpsPlayer.All.Count})", smallStyle);
+        y += 26;
+        float listBottom = panel.yMax - 110;
+        var nameStyle = new GUIStyle(bodyStyle) { fontSize = 17, wordWrap = false, clipping = TextClipping.Clip };
+        var stateStyle = new GUIStyle(bodyStyle) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+        foreach (var p in FpsPlayer.All)
+        {
+            if (y + 34 > listBottom) { GUI.Label(new Rect(x, y, iw, 24), "…", bodyStyle); break; }
+            Fill(new Rect(x, y, iw, 34), new Color(1f, 1f, 1f, p == me ? 0.1f : 0.04f));
+            Fill(new Rect(x + 12, y + 12, 10, 10), p.PlayerColor);
+            string tag = p.IsBot.Value ? "  <size=12>[BOT]</size>" : p.IsHostPlayer ? "  <size=12>HOST</size>" : "";
+            if (p == me) tag += "  <size=12>(you)</size>";
+            GUI.Label(new Rect(x + 32, y + 5, iw - 230, 26), p.DisplayName + tag, nameStyle);
+            bool ready = p.IsHostPlayer || p.Ready.Value;
+            string state = p.IsHostPlayer ? "STARTS THE MATCH" : ready ? "READY" : "NOT READY";
+            GUI.Label(new Rect(x + iw - 200, y + 4, 186, 26), state, stateStyle);
+            if (!p.IsHostPlayer)
+                Fill(new Rect(x + iw - 6, y, 6, 34), ready ? new Color(0.3f, 0.9f, 0.4f) : new Color(0.9f, 0.3f, 0.25f));
+            y += 40;
+        }
+
+        // Ready / Start, and Leave.
+        float by = panel.yMax - 76, bw = (iw - 16) * 0.68f;
+        bool busy = Time.unscaledTime < lobbyBusyUntil;
+        if (isHost)
+        {
+            bool allReady = MatchRules.EveryoneReady(out int waiting);
+            GUI.enabled = allReady && !busy;
+            string text = allReady ? "START MATCH" : $"WAITING FOR {waiting} PLAYER{(waiting == 1 ? "" : "S")}";
+            if (GUI.Button(new Rect(x, by, bw, 54), text, bigButtonStyle))
+            {
+                lobbyBusyUntil = Time.unscaledTime + 1f;
+                MatchRules.StartMatch();
+            }
+            GUI.enabled = true;
+            GUI.Label(new Rect(x, by - 26, iw, 22), "Start unlocks when every player is ready.", smallStyle);
+        }
+        else
+        {
+            bool ready = me.Ready.Value;
+            GUI.enabled = !busy;
+            if (GUI.Button(new Rect(x, by, bw, 54), ready ? "READY  (CLICK TO UNREADY)" : "READY UP", ready ? navActiveStyle : bigButtonStyle))
+            {
+                lobbyBusyUntil = Time.unscaledTime + 0.3f;
+                me.Ready.Value = !ready;
+            }
+            GUI.enabled = true;
+            GUI.Label(new Rect(x, by - 26, iw, 22), "The host starts the match once everyone is ready.", smallStyle);
+        }
+        var leaveStyle = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 };
+        if (GUI.Button(new Rect(x + bw + 16, by, iw - bw - 16, 54), isHost ? "END GAME" : "LEAVE", leaveStyle))
+            Disconnect();
     }
 
     // ------------------------------------------------------------------ Customize

@@ -8,7 +8,7 @@ public static partial class ProjectBuilder
 {
     // ================================================================== Camp Timberline (forest map)
     //
-    // Same playable footprint as Kirktown (X -68..68, Z -46..66). A summer camp sits in a flat clearing in the middle
+    // Same playable footprint as Fluketown (X -68..68, Z -46..66). A summer camp sits in a flat clearing in the middle
     // (mess hall, cabins, campfire), a pond with a dock lies to the south, the parking lot and gate to the north, and
     // wooded hills climb along the west and east edges: a fire lookout tower on the west ridge, a ranger station and
     // deer stand on the east one. Trees everywhere outside the clearing.

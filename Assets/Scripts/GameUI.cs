@@ -13,6 +13,8 @@ using UnityEngine.InputSystem;
 /// Also reads command-line flags for quick testing:
 ///   -ffahost | -ffarelay | -ffaclient &lt;ip or join code&gt;   start immediately (-ffarelay hosts online with a join code)
 ///   -ffaprofile &lt;name&gt;   separate Unity services sign-in, for several copies on one PC
+///   -ffalobby   a command-line host starts in the waiting lobby like a menu host
+///   -ffaready   ready up in the lobby   -ffastartwhenready   (host) start the match once everyone is ready
 ///   -ffaname &lt;name&gt;  -ffaport &lt;port&gt;
 ///   -ffaautotest   the local player aims and fires at the nearest enemy by itself
 ///   -ffaquitafter &lt;seconds&gt;   -ffascreenshot &lt;png path&gt; (taken after 4 seconds)
@@ -31,6 +33,7 @@ public partial class GameUI : MonoBehaviour
     public static bool ForceFire { get; private set; } // -ffafire: hold the trigger (effects screenshots)
     public static bool ForceThrow { get; private set; } // -ffathrow: cook and throw a grenade (tests)
     public static bool CenterDot { get; private set; }  // -ffacenterdot: mark the exact screen centre (sight alignment checks)
+    static bool autoReady, autoStart; // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
     static GameUI instance;
@@ -292,6 +295,9 @@ public partial class GameUI : MonoBehaviour
         ForceFire = args.Contains("-ffafire");
         ForceThrow = args.Contains("-ffathrow");
         CenterDot = args.Contains("-ffacenterdot");
+        autoReady = args.Contains("-ffaready");
+        autoStart = args.Contains("-ffastartwhenready");
+        if (int.TryParse(Arg("-ffafraglimit"), out int fragLimit)) MatchRules.OverrideFragLimit(fragLimit);
         if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 2); // screenshot tests
         if (int.TryParse(Arg("-ffaskin"), out int sk)) GameSettings.Skin = Mathf.Clamp(sk, 0, Skins.Count - 1);
         if (int.TryParse(Arg("-ffastance"), out int ts)) TestStance = ts;
@@ -321,7 +327,7 @@ public partial class GameUI : MonoBehaviour
             MapCatalog.Apply(HostMap);
         }
         if (args.Contains("-ffahost") || args.Contains("-ffarelay"))
-            Host(args.Contains("-ffarelay"));
+            Host(args.Contains("-ffarelay"), lobby: args.Contains("-ffalobby")); // test sessions skip the lobby unless asked
         else if (Arg("-ffaclient") is { } ip)
         {
             address = ip;
@@ -342,9 +348,16 @@ public partial class GameUI : MonoBehaviour
     void Update()
     {
         var local = FpsPlayer.Local;
-        bool inGame = local != null;
+        bool inGame = local != null && !local.InLobby.Value;
         if (menuCamera != null)
             menuCamera.enabled = !inGame;
+
+        if (local != null && local.InLobby.Value)
+        {
+            if (autoReady && !Net.IsServer && !local.Ready.Value) local.Ready.Value = true;
+            if (autoStart && Net.IsServer && MatchRules.LobbyOpen && FpsPlayer.All.Count >= 2 && MatchRules.EveryoneReady(out _))
+                MatchRules.StartMatch();
+        }
 
         if (inGame && !wasInGame)
             SetCursorCaptured(true);
@@ -387,8 +400,8 @@ public partial class GameUI : MonoBehaviour
     bool connecting; // waiting on Unity Relay (sign-in / allocation) before the session starts
 
     /// <param name="online">Host through Unity Relay and show a join code; otherwise listen on the port for direct IP joins.</param>
-    /// <param name="bots">Fighter bots to add once the host's player has spawned.</param>
-    async void Host(bool online, int bots = 0)
+    /// <param name="lobby">Hold everyone in the waiting lobby until the host starts the match.</param>
+    async void Host(bool online, bool lobby)
     {
         if (connecting || InSession) return;
         ushort p = 0;
@@ -407,11 +420,11 @@ public partial class GameUI : MonoBehaviour
         }
         else
             transport.SetConnectionData("127.0.0.1", p, "0.0.0.0");
+        MatchRules.BeginSession(lobby);
         status = Net.StartHost() ? "" : online ? "Could not start the online game." : $"Could not host on port {p} (already in use?)";
         if (status != "") RelayConnect.ClearCode();
         Debug.Log(online ? $"[FFA] Hosting online, join code {RelayConnect.Code}: {(status == "" ? "ok" : status)}"
                          : $"[FFA] Hosting on port {p}: {(status == "" ? "ok" : status)}");
-        if (status == "" && bots > 0) StartCoroutine(SpawnHostBots(bots));
     }
 
     async void Join()
@@ -456,6 +469,7 @@ public partial class GameUI : MonoBehaviour
         MapCatalog.Apply(HostMap);
         winner = "";
         status = "";
+        lobbyBusyUntil = 0f;
     }
 
     bool TryGetPort(out ushort p)
@@ -550,6 +564,8 @@ public partial class GameUI : MonoBehaviour
 
         if (!InSession)
             DrawMainMenu(w, h);
+        else if (FpsPlayer.Local != null && FpsPlayer.Local.InLobby.Value)
+            DrawLobby(w, h);
         else if (FpsPlayer.Local == null)
         {
             Shadowed(new Rect(0, h / 2 - 40, w, 30), "Connecting...", centerLabel, Color.white);

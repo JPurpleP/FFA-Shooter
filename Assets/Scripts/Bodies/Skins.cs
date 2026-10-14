@@ -52,8 +52,8 @@ public static class Skins
     {
         new SkinDef
         {
-            Name = "Original", Description = "White FREEDOM tee, dark jeans, short black hair.",
-            Shirt = new Color(0.95f, 0.95f, 0.94f), FreedomPrint = true,
+            Name = "Original", Description = "Plain white tee, dark jeans, short black hair.",
+            Shirt = new Color(0.95f, 0.95f, 0.94f),
         },
         new SkinDef
         {

@@ -11,7 +11,7 @@ using Object = UnityEngine.Object;
 
 /// <summary>
 /// Generates the game's assets from code: textures, materials, the networked player and pickup prefabs,
-/// and the maps (Kirktown and Camp Timberline). Menu: FFA > Rebuild Arena.
+/// and the maps (Fluketown and Camp Timberline). Menu: FFA > Rebuild Arena.
 /// Batch mode: -executeMethod ProjectBuilder.RebuildAll / ProjectBuilder.BuildWindows
 /// </summary>
 public static partial class ProjectBuilder
@@ -380,14 +380,14 @@ public static partial class ProjectBuilder
             }, alpha: true, repeat: false);
         }
 
-        // "KIRKTOWN" welcome-sign lettering, same band layout.
+        // "FLUKETOWN" welcome-sign lettering, same band layout.
         Tex("SignText", 1024, (x, y) =>
         {
             if (y >= 160) return new Color(0f, 0f, 0f, 0f);
             float cover = 0f;
             for (int sy = 0; sy < 2; sy++)
                 for (int sx = 0; sx < 2; sx++)
-                    if (WordGlyphAt(KirktownLetters, 0.24f, x + 0.25f + sx * 0.5f, y + 0.25f + sy * 0.5f)) cover += 0.25f;
+                    if (WordGlyphAt(FluketownLetters, 0.24f, x + 0.25f + sx * 0.5f, y + 0.25f + sy * 0.5f)) cover += 0.25f;
             return new Color(0.1f, 0.22f, 0.14f, cover);
         }, alpha: true, repeat: false);
 
@@ -527,7 +527,7 @@ public static partial class ProjectBuilder
         ('C', 0.74f), ('A', 0.8f), ('M', 0.86f), ('P', 0.66f), (' ', 0.3f),
         ('T', 0.7f), ('I', 0.3f), ('M', 0.86f), ('B', 0.68f), ('E', 0.66f), ('R', 0.7f), ('L', 0.6f), ('I', 0.3f), ('N', 0.74f), ('E', 0.66f),
     };
-    static readonly (char c, float w)[] KirktownLetters = { ('K', 0.7f), ('I', 0.3f), ('R', 0.7f), ('K', 0.7f), ('T', 0.7f), ('O', 0.86f), ('W', 1.02f), ('N', 0.74f) };
+    static readonly (char c, float w)[] FluketownLetters = { ('F', 0.66f), ('L', 0.6f), ('U', 0.74f), ('K', 0.7f), ('E', 0.66f), ('T', 0.7f), ('O', 0.86f), ('W', 1.02f), ('N', 0.74f) };
 
     /// <summary>Is pixel (px, py) of a 1024x160 text band inside the given word (centered, 100px letters)?</summary>
     static bool WordGlyphAt((char c, float w)[] letters, float tracking, float px, float py, float em = 100f)
@@ -589,6 +589,8 @@ public static partial class ProjectBuilder
             case 'W': return Seg(T * 0.5f, 1 - T * 0.5f, w * 0.27f, T * 0.5f) || Seg(w * 0.27f, T * 0.5f, w * 0.5f, 0.72f)
                              || Seg(w * 0.5f, 0.72f, w * 0.73f, T * 0.5f) || Seg(w * 0.73f, T * 0.5f, w - T * 0.5f, 1 - T * 0.5f);
             case 'L': return Rect(0, 0, T, 1) || Rect(0, 0, w, T);
+            case 'U': return Rect(0, 0.35f, T, 1) || Rect(w - T, 0.35f, w, 1)
+                             || y <= 0.35f && Ring(w * 0.5f, 0.35f, w * 0.5f - T * 0.5f, 0.35f - T * 0.5f, false);
             case 'P':
             {
                 float cx = 0.3f, bot = 0.42f;
@@ -987,12 +989,12 @@ public static partial class ProjectBuilder
         // Every map is built into this scene under its own root; MapCatalog switches between them at runtime.
         passages.Clear();
         BuildNuketown();
-        PlaceWeaponSpawners("Kirktown", 34);
-        PlaceHookSpawners("Kirktown", 6);
-        var kirktown = world.gameObject;
+        PlaceWeaponSpawners("Fluketown", 34);
+        PlaceHookSpawners("Fluketown", 6);
+        var fluketown = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, -2.5f), new Vector3(90f, 30f, 70f));
-        ValidateDoorways("Kirktown");
-        kirktown.SetActive(false);
+        ValidateDoorways("Fluketown");
+        fluketown.SetActive(false);
 
         passages.Clear();
         BuildCampground();
@@ -1011,7 +1013,7 @@ public static partial class ProjectBuilder
         AddProbe(world, new Vector3(0f, 8f, 10f), new Vector3(140f, 40f, 115f));
         ValidateDoorways("Downtown");
         city.SetActive(false);
-        kirktown.SetActive(true);
+        fluketown.SetActive(true);
         BuildDuelArenas();
 
         // Networking & game systems
@@ -1041,7 +1043,7 @@ public static partial class ProjectBuilder
         {
             new MapCatalog.Entry
             {
-                name = "Kirktown", description = "Suburban cul-de-sac and side streets.", root = kirktown,
+                name = "Fluketown", description = "Suburban cul-de-sac and side streets.", root = fluketown,
             },
             new MapCatalog.Entry
             {
@@ -1138,7 +1140,7 @@ public static partial class ProjectBuilder
         // ---------------------------------------------------------------- ground and roads
         Box(world, "Desert", new Vector3(0f, -0.5f, 0f), new Vector3(900f, 1f, 900f), M("Sand"));
         Box(world, "Grass", new Vector3(0f, -0.04f, cz), new Vector3(w, 0.1f, d), M("Grass"));
-        // Kirktown street (original), running north into the avenue, with the cul-de-sac at its south end.
+        // Fluketown street (original), running north into the avenue, with the cul-de-sac at its south end.
         Box(world, "Street", new Vector3(0f, -0.03f, 0f), new Vector3(12f, 0.1f, 62f), M("Asphalt"));
         Cylinder(world, "CulDeSac", new Vector3(0f, -0.03f, -20f), 11f, 0.1f, M("Asphalt"));
         Box(world, "Sidewalk W", new Vector3(-6.75f, 0.06f, 10.5f), new Vector3(1.5f, 0.12f, 41f), M("Concrete"));
@@ -1188,7 +1190,7 @@ public static partial class ProjectBuilder
         Box(world, "TowerCab", new Vector3(-170f, 51f, 230f), new Vector3(6f, 4f, 6f), M("Metal"));
 
         // ---------------------------------------------------------------- houses
-        // Kirktown: the original pair facing each other across the street.
+        // Fluketown: the original pair facing each other across the street.
         var yellow = BuildHouse("Yellow House", new Vector3(-22.5f, 0f, -1f), 0f, M("SidingYellow"), M("Roof"), M("CarCream"));
         var green = BuildHouse("Green House", new Vector3(22.5f, 0f, 1f), 180f, M("SidingGreen"), M("RoofRed"), M("CarGreen"));
         // North row facing the avenue.
@@ -1222,7 +1224,7 @@ public static partial class ProjectBuilder
         // Hedge line between the cul-de-sac and the south lane (with gaps to run through).
         for (float x = -34f; x < 34f; x += 8f)
             Box(world, "Hedge", new Vector3(x + 2.5f, 0.6f, -34.5f), new Vector3(5f, 1.2f, 1f), M("Hedge"));
-        // Trees along the alleys behind the Kirktown backyards and along the avenue.
+        // Trees along the alleys behind the Fluketown backyards and along the avenue.
         foreach (float z in new[] { -28f, -16f, 8f, 20f })
         {
             Tree(new Vector3(-40.5f, 0f, z), 3.2f);
@@ -1243,7 +1245,7 @@ public static partial class ProjectBuilder
         spawns.SetParent(world, false);
         var spawnPositions = new[]
         {
-            // Kirktown
+            // Fluketown
             new Vector3(-34.5f, 0.05f, -3f), new Vector3(-31.5f, 0.05f, 9f), new Vector3(34.5f, 0.05f, 3f), new Vector3(31.5f, 0.05f, -9f),
             new Vector3(0f, 0.05f, 24.3f), new Vector3(0f, 0.05f, -28.5f), new Vector3(-14f, 0.05f, -24f), new Vector3(14f, 0.05f, 22f),
             // Avenue and north row

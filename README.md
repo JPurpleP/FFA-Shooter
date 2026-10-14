@@ -1,6 +1,6 @@
 # FFA Shooter
 
-Online free-for-all first-person shooter with three maps of the same size (about 136 × 112 m). **Kirktown** is a
+Online free-for-all first-person shooter with three maps of the same size (about 136 × 112 m). **Fluketown** is a
 Nuketown-style suburb: the original cul-de-sac block plus a north avenue, two side streets, eight more houses, a south
 park, playground, court and water tower. **Timberline** is a summer camp in a forested valley: mess hall, four cabins,
 campfire, tents, a pond with a dock, a parking lot and gate, and wooded hills along the west and east edges (fire
@@ -12,7 +12,7 @@ Netcode for GameObjects 2.13 + Unity Transport (host/client, online through Unit
 bodies, gore, sounds) is generated from code — no imported art or audio.
 
 ## Play
-- Run `Builds/Windows/FFA-Shooter.exe`. Main menu: **Play** (name, Host with a map choice and optional bots, Join —
+- Run `Builds/Windows/FFA-Shooter.exe`. Main menu: **Play** (name, Host with a map choice, Join —
   joiners load whatever map the host picked),
   **Customize** (skins with a live 3D preview: Original, Rainbow, Hi-Vis Worker, Tactical, Chef, Clown,
   Banana Suit, Astronaut, Cowboy, Pirate, Alien, Luchador, Tourist,
@@ -24,7 +24,10 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   with a copy button, and on the Tab leaderboard), friends type it into Join. No port forwarding, no IP addresses shared.
   **LAN / Direct IP** listens on the port as before; friends type your address. Join accepts either a code or an address.
   Online needs the project linked to Unity Gaming Services with Relay enabled (see *Online setup* below).
-- First to 25 kills wins; scores reset after 8 seconds. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
+- **Lobby.** Hosting or joining puts you in a waiting lobby (player list, join code). Everyone presses **Ready Up**; the
+  host's **Start Match** unlocks once every player is ready. No bots in normal games (the F1 dev panel can still add them).
+  Players who join mid-match drop straight in.
+- First to 25 kills wins; after 8 seconds everyone goes back to the lobby to ready up for the next match. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
 - Controls: WASD · Shift sprint · Space jump · LMB fire · RMB aim (scope on the Barrett) · **Q/E lean** · R reload ·
   F pick up / swap · 1/2 or mouse wheel to switch · Tab scores · Esc menu · **F1 dev panel**
 - Leaning moves your head (and its hitbox) out from cover; it stops short of walls.
@@ -102,10 +105,12 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   slow-motion, damage numbers, bot status labels, bot nav-graph overlay, respawn pickups, clear corpses.
 - Command line:
   ```
-  -ffamap <0-2>    host Kirktown / Timberline / Downtown (not saved)
+  -ffamap <0-2>    host Fluketown / Timberline / Downtown (not saved)
   -ffastreak <n>   start with an n-kill streak   -ffaturn <deg>  swing the view   -ffahook  start with the grappling hook
   -ffabackground [-ffareturnfocus <hwnd>]   test window that never takes focus or the mouse (pair with -monitor 2)
-  -ffahost | -ffarelay | -ffaclient <ip or join code>   -ffaname <n>  -ffaport <p>  -ffaquitafter <s>
+  -ffahost | -ffarelay | -ffaclient <ip or join code>   (command-line hosts skip the lobby unless -ffalobby;
+                    -ffaready readies a client up, -ffastartwhenready makes the host start once all are ready)
+  -ffaname <n>  -ffaport <p>  -ffaquitafter <s>  -ffafraglimit <n>  shorter matches (tests)
   -ffaprofile <name>   separate Unity services sign-in (several online copies on one PC)
   -ffabots <n> [Dummy|Strafer|Turret|Fighter]   spawn bots after hosting
   -ffaautotest     the local player is driven by the Fighter bot AI (logs scores)
@@ -128,7 +133,7 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 - `Assets/Scripts/Dev/` – dev panel and settings
 - `Assets/Scripts/MapCatalog.cs` – every map lives in the one scene under its own root; switches the active map,
   its lighting and the bot graph (clients follow the host via `FpsPlayer.MapId`)
-- `Assets/Editor/ProjectBuilder.cs` – generates textures, materials, prefabs and Kirktown; `ProjectBuilder.Forest.cs`
+- `Assets/Editor/ProjectBuilder.cs` – generates textures, materials, prefabs and Fluketown; `ProjectBuilder.Forest.cs`
   builds Timberline (heightmap ground mesh, generated tree/rock meshes, cabins, lookout); `ProjectBuilder.City.cs`
   builds Downtown (metre-scaled facade/brick meshes via `metricTile`, walk-in shops, garage, construction site). Re-run **FFA > Rebuild Arena**
   after changing it (overwrites `Assets/Generated` and the scene). Build: `-executeMethod ProjectBuilder.BuildWindows`.
