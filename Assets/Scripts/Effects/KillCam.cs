@@ -36,6 +36,7 @@ public class KillCam : MonoBehaviour
     public static bool Active { get; private set; }
     public static string KillerName { get; private set; } = "";
     public static string WeaponName { get; private set; } = "";
+    public static Color KillerColor { get; private set; } = Color.white;
     /// <summary>0..1 through the replay.</summary>
     public static float Progress { get; private set; }
 
@@ -137,6 +138,7 @@ public class KillCam : MonoBehaviour
         float from = Mathf.Max(deathTime - Lead, killerPath[0].t), to = deathTime + Tail;
         var def = WeaponDefs.Get(weapon);
         KillerName = killer.DisplayName;
+        KillerColor = killer.PlayerColor;
         WeaponName = def != null ? def.Name : "";
 
         // Camera through the killer's eyes, holding their gun at the hip.

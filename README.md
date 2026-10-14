@@ -33,22 +33,25 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   walking your last steps, before you respawn.
 - First to 25 kills wins; after 8 seconds everyone goes back to the lobby to ready up for the next match. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
 - Controls: WASD · Shift sprint · Space jump · LMB fire · RMB aim (scope on the Barrett) · **Q/E lean** · R reload ·
-  F pick up / swap · 1/2 or mouse wheel to switch · Tab scores · Esc menu · **F1 dev panel**
+  F pick up / swap · 1/2 or mouse wheel to switch · Tab scores · Esc menu (resume, sensitivity / FOV / volume, join code, leave)
 - Leaning moves your head (and its hitbox) out from cover; it stops short of walls.
 - **Ctrl**: tap (or press while standing still / walking) to crouch or stand. **Hold Ctrl while sprinting to slide** —
   a burst of speed that decays; keep holding to end in a crouch, Space to slide-jump. **Hold Ctrl in the air** and you
   land straight into a slide that keeps all your speed (chain slide-jumps, or land a grapple swing / rocket jump sliding). **Z** goes prone / stands up.
   Crouch and prone are slower but more accurate and harder to hit; Space stands you up (not under a low ceiling).
 - **G / middle mouse: grappling hook** — once you've picked one up. Hooks are their own pickups (6 per map, on spots between
-  the weapon spawns, back 45 s after being taken); you keep it until you die, then it drops where you fell. (45 m, 2.5 s cooldown.) Reels you in fast; G or Space releases and you keep the
+  the weapon spawns, back 45 s after being taken); you keep it until you die, then it drops where you fell. (30 m, 2.5 s cooldown.) Reels you in fast; G or Space releases and you keep the
   momentum, so you can swing and launch. Arriving at a ledge pops you up onto it. Cyan brackets = hookable target.
 
 ## Killstreaks
-Kills since your last death count as a streak (shown bottom-left).
-- **5 in a row: ESP** for 30 s. Every enemy is outlined through walls: box, name, distance, health bar and their live skeleton.
-- **10 in a row: Aimbot** for 30 s. Your aim snaps to the head of the visible enemy nearest your crosshair.
+Kills since your last death count as a streak (shown bottom-left, with the next reward). Each reward lasts 30 s.
+- **3 in a row: Speed hack.** Double running, walking and sliding speed.
+- **5 in a row: ESP.** Every enemy is outlined through walls: box, name, distance, health bar and their live skeleton.
+- **8 in a row: Flyhack.** No gravity: Space rises, Ctrl sinks (kept under 45 m and inside the map). When it ends, you fall.
+- **10 in a row: Aimbot.** Your aim snaps to the head of the visible enemy nearest your crosshair.
 Dying resets the streak (running rewards finish their 30 s); a new match clears everything. Bots earn them too (perfect
-aim / hunting you through walls).
+aim / hunting you through walls / speed; bots don't fly).
+
 ## Weapons
 | Weapon | Mag | Notes |
 |---|---|---|
@@ -104,7 +107,7 @@ body away from the blast. Call `Gore.Explosion(center, radius, speed)` on every 
 already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast at crosshair" button.
 
 ## Testing tools
-- **F1 dev panel** (host): spawn bots (Dummy / Strafer / Turret / Fighter), bot accuracy, give weapons, god mode, infinite ammo,
+- **F1 dev panel** (host; only in the editor, development builds, or with `-ffadev`): spawn bots (Dummy / Strafer / Turret / Fighter), bot accuracy, give weapons, god mode, infinite ammo,
   **gore lab** (spawn a dummy in front of you and execute it with any weapon/body part, or auto-cycle), gore multiplier,
   slow-motion, damage numbers, bot status labels, bot nav-graph overlay, respawn pickups, clear corpses.
 - Command line:
@@ -121,7 +124,7 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   -ffagive <0-4>   start with a weapon    -ffaaim  hold aim-down-sights    -ffalean <-1..1>  hold a lean
   -ffagrapple <pitch>   look up by <pitch> degrees and fire the hook
   -ffagoretest     auto-cycling gore lab   -ffagorepart <0-5>  -ffagoreweapon <0-5>
-  -ffaat <x> <z> <yaw>   teleport   -ffadummy <dist> [-ffadummyyaw <deg>] [-ffadummypose 0-3]   -ffastance 1|2|3   -ffaduel  start a golden duel with the first bot
+  -ffaat <x> <z> <yaw>   teleport   -ffadummy <dist> [-ffadummyyaw <deg>] [-ffadummypose 0-3]   -ffastance 1|2|3|4|5 (crouch, prone, slide, air slide, fly up)   -ffadev  enable the F1 panel   -ffaduel  start a golden duel with the first bot
   -ffashots <prefix> <count> <interval>   screenshot series   -ffascreenshot <file>
   -ffamenutab <0-2>  -ffaskin <id>  -ffaskinline [first] [count]   -ffafire   hold the trigger   -ffathrow  cook and throw a grenade   -ffabotgive <id>  arm all bots        -ffatopdown [size] [x] [z]   orthographic map overview, UI hidden
   ```

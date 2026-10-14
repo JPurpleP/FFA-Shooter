@@ -33,13 +33,13 @@ public partial class GameUI : MonoBehaviour
     public static bool ForceFire { get; private set; } // -ffafire: hold the trigger (effects screenshots)
     public static bool ForceThrow { get; private set; } // -ffathrow: cook and throw a grenade (tests)
     public static bool CenterDot { get; private set; }  // -ffacenterdot: mark the exact screen centre (sight alignment checks)
-    static bool autoReady, autoStart; // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
+    static bool autoReady, autoStart, forcePause; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
     static GameUI instance;
     static float captureTime;
 
-    string address = "127.0.0.1";
+    string address = "";
     string port = "7777";
     string status = "";
     string localAddresses = "";
@@ -323,6 +323,7 @@ public partial class GameUI : MonoBehaviour
         CenterDot = args.Contains("-ffacenterdot");
         autoReady = args.Contains("-ffaready");
         autoStart = args.Contains("-ffastartwhenready");
+        forcePause = args.Contains("-ffapause");
         if (int.TryParse(Arg("-ffafraglimit"), out int fragLimit)) MatchRules.OverrideFragLimit(fragLimit);
         if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 2); // screenshot tests
         if (int.TryParse(Arg("-ffaskin"), out int sk)) GameSettings.Skin = Mathf.Clamp(sk, 0, Skins.Count - 1);
@@ -593,11 +594,7 @@ public partial class GameUI : MonoBehaviour
         else if (FpsPlayer.Local != null && FpsPlayer.Local.InLobby.Value)
             DrawLobby(w, h);
         else if (FpsPlayer.Local == null)
-        {
-            Shadowed(new Rect(0, h / 2 - 40, w, 30), "Connecting...", centerLabel, Color.white);
-            if (GUI.Button(new Rect(w / 2 - 60, h / 2, 120, 30), "Cancel"))
-                Disconnect();
-        }
+            DrawConnecting(w, h);
         else
             DrawHud(w, h);
     }
@@ -605,16 +602,22 @@ public partial class GameUI : MonoBehaviour
     /// <summary>Replay through the killer's eyes: letterbox bars, a title and who / what killed you (replaces the HUD).</summary>
     void DrawKillCamOverlay(float w, float h)
     {
-        Fill(new Rect(0, 0, w, 54), new Color(0f, 0f, 0f, 0.75f));
-        Fill(new Rect(0, h - 54, w, 54), new Color(0f, 0f, 0f, 0.75f));
+        Fill(new Rect(0, 0, w, 56), new Color(0f, 0f, 0f, 0.8f));
+        Fill(new Rect(0, h - 64, w, 64), new Color(0f, 0f, 0f, 0.8f));
+        Fill(new Rect(0, 56, w, 2), new Color(1f, 0.3f, 0.3f, 0.8f));
         Shadowed(new Rect(30, 10, 300, 36), "<b>KILLCAM</b>", new GUIStyle(label) { fontSize = 26 }, new Color(1f, 0.3f, 0.3f));
-        Shadowed(new Rect(0, h - 46, w, 36), $"<b>{KillCam.KillerName}</b>   <size=14>{KillCam.WeaponName}</size>",
+        float remaining = Mathf.Max(0f, FpsPlayer.RespawnDelay - (Time.time - deathTime));
+        Shadowed(new Rect(w - 330, 16, 300, 26), $"Respawning in {remaining:0.0}", new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = 16 }, new Color(1f, 1f, 1f, 0.8f));
+        string killerHex = ColorUtility.ToHtmlStringRGB(KillCam.KillerColor);
+        Shadowed(new Rect(0, h - 58, w, 22), "KILLED BY", new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold }, new Color(1f, 1f, 1f, 0.6f));
+        Shadowed(new Rect(0, h - 38, w, 30), $"<color=#{killerHex}>■</color> <b>{KillCam.KillerName}</b>   <size=14>{KillCam.WeaponName}</size>",
             new GUIStyle(centerLabel) { fontSize = 20 }, Color.white);
         Fill(new Rect(0, h - 3, w * KillCam.Progress, 3), new Color(1f, 0.3f, 0.3f, 0.9f));
-        float c2 = w / 2, cy2 = h / 2; // killer's crosshair
-        var ch = new Color(1f, 1f, 1f, 0.8f);
-        Fill(new Rect(c2 - 10, cy2 - 1, 7, 2), ch); Fill(new Rect(c2 + 3, cy2 - 1, 7, 2), ch);
-        Fill(new Rect(c2 - 1, cy2 - 10, 2, 7), ch); Fill(new Rect(c2 - 1, cy2 + 3, 2, 7), ch);
+        float c2 = w / 2, cy2 = h / 2; // the killer's crosshair
+        var ch = new Color(1f, 1f, 1f, 0.85f);
+        Fill(new Rect(c2 - 12, cy2 - 1, 8, 2), ch); Fill(new Rect(c2 + 4, cy2 - 1, 8, 2), ch);
+        Fill(new Rect(c2 - 1, cy2 - 12, 2, 8), ch); Fill(new Rect(c2 - 1, cy2 + 4, 2, 8), ch);
+        Fill(new Rect(c2 - 1, cy2 - 1, 2, 2), ch);
     }
 
     void DrawHud(float w, float h)
@@ -712,15 +715,27 @@ public partial class GameUI : MonoBehaviour
             Shadowed(new Rect(32, perkY, 260, 22), $"AIMBOT  {Mathf.CeilToInt(me.AimbotSecondsLeft)}s", label, new Color(1f, 0.35f, 0.3f));
             perkY -= 22;
         }
+        if (me.FlyActive)
+        {
+            Shadowed(new Rect(32, perkY, 300, 22), $"FLYHACK  {Mathf.CeilToInt(me.FlySecondsLeft)}s  <size=12>Space up · Ctrl down</size>", label, new Color(0.6f, 0.75f, 1f));
+            perkY -= 22;
+        }
         if (me.EspActive)
         {
             Shadowed(new Rect(32, perkY, 260, 22), $"ESP  {Mathf.CeilToInt(me.EspSecondsLeft)}s", label, new Color(0.4f, 1f, 0.6f));
             perkY -= 22;
         }
+        if (me.SpeedActive)
+        {
+            Shadowed(new Rect(32, perkY, 260, 22), $"SPEED HACK  {Mathf.CeilToInt(me.SpeedSecondsLeft)}s", label, new Color(1f, 0.85f, 0.25f));
+            perkY -= 22;
+        }
         if (me.Streak.Value > 0)
         {
-            int next = me.Streak.Value < FpsPlayer.EspStreak ? FpsPlayer.EspStreak : me.Streak.Value < FpsPlayer.AimbotStreak ? FpsPlayer.AimbotStreak : 0;
-            Shadowed(new Rect(32, perkY, 300, 22), $"<size=13>STREAK {me.Streak.Value}{(next > 0 ? $"  ·  {(next == FpsPlayer.EspStreak ? "ESP" : "AIMBOT")} at {next}" : "")}</size>", label, new Color(1f, 1f, 1f, 0.75f));
+            int s = me.Streak.Value;
+            var (next, name) = s < FpsPlayer.SpeedStreak ? (FpsPlayer.SpeedStreak, "SPEED") : s < FpsPlayer.EspStreak ? (FpsPlayer.EspStreak, "ESP")
+                : s < FpsPlayer.FlyStreak ? (FpsPlayer.FlyStreak, "FLY") : s < FpsPlayer.AimbotStreak ? (FpsPlayer.AimbotStreak, "AIMBOT") : (0, "");
+            Shadowed(new Rect(32, perkY, 300, 22), $"<size=13>STREAK {s}{(next > 0 ? $"  ·  {name} at {next}" : "")}</size>", label, new Color(1f, 1f, 1f, 0.75f));
         }
 
         // Stance
@@ -804,8 +819,13 @@ public partial class GameUI : MonoBehaviour
         string top = $"First to {MatchRules.FragLimit} kills  ·  You: {me.Kills.Value}";
         if (leader != null && leader != me) top += $"  ·  Leader: {leader.DisplayName} ({leader.Kills.Value})";
         Shadowed(new Rect(0, 10, w, 24), top, centerLabel, Color.white);
-        if (Net.IsServer && !string.IsNullOrEmpty(localAddresses) && !DevPanel.Open)
-            Shadowed(new Rect(10, 10, 500, 24), $"<size=12>Hosting · LAN: {localAddresses} · port {port}</size>", label, new Color(1, 1, 1, 0.7f));
+        // Top-left: how friends join (online code, or the host's LAN address).
+        if (!DevPanel.Open)
+        {
+            string how = RelayConnect.Code != "" ? $"JOIN CODE  <b>{RelayConnect.Code}</b>"
+                : Net.IsServer && !string.IsNullOrEmpty(localAddresses) ? $"LAN GAME  ·  {localAddresses} : {port}" : "";
+            if (how != "") Shadowed(new Rect(12, 10, 500, 24), $"<size=13>{how}</size>", label, new Color(1, 1, 1, 0.75f));
+        }
 
         // Kill feed
         var feedStyle = new GUIStyle(label) { alignment = TextAnchor.UpperRight, fontSize = 14 };
@@ -845,7 +865,7 @@ public partial class GameUI : MonoBehaviour
         if (CenterDot) // test flag: the exact screen centre, where every shot goes
             Fill(new Rect(w / 2 - 1f, h / 2 - 1f, 2f, 2f), new Color(1f, 0f, 1f, 1f));
 
-        if (Cursor.lockState != CursorLockMode.Locked && !AutoTest && !DevPanel.Open && !BackgroundTestWindow.Active)
+        if (forcePause || (Cursor.lockState != CursorLockMode.Locked && !AutoTest && !DevPanel.Open && !BackgroundTestWindow.Active))
             DrawPauseMenu(w, h);
     }
 
@@ -939,24 +959,81 @@ public partial class GameUI : MonoBehaviour
     }
 
     float codeCopiedTime = -10f;
+    bool confirmLeave;
 
+    /// <summary>Esc menu: resume, quick settings, join code, leave / quit (styled like the main menu).</summary>
     void DrawPauseMenu(float w, float h)
     {
+        EnsureMenuStyles();
         bool online = RelayConnect.Code != "";
-        var r = new Rect(w / 2 - 120, h / 2 - 90, 240, online ? 260 : 180);
-        GUI.Box(r, "Paused", boxStyle);
-        if (GUI.Button(new Rect(r.x + 20, r.y + 35, 200, 36), "Resume")) SetCursorCaptured(true);
-        if (GUI.Button(new Rect(r.x + 20, r.y + 80, 200, 36), Net.IsServer ? "End Game" : "Leave Game")) Disconnect();
-        if (GUI.Button(new Rect(r.x + 20, r.y + 125, 200, 36), "Quit to Desktop")) QuitGame();
-        if (!online) return;
-        // Join code to invite friends (anyone in an online game can share it).
-        Shadowed(new Rect(r.x + 20, r.y + 170, 200, 22), $"JOIN CODE  <b><size=20>{RelayConnect.Code}</size></b>",
-            new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = 13 }, Color.white);
-        if (GUI.Button(new Rect(r.x + 20, r.y + 204, 200, 36), Time.unscaledTime - codeCopiedTime < 1.5f ? "Copied!" : "Copy Join Code"))
+        Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.45f));
+        float pw = 440, ph = online ? 484 : 430;
+        var r = new Rect((w - pw) / 2f, (h - ph) / 2f, pw, ph);
+        Fill(r, new Color(0.04f, 0.05f, 0.07f, 0.94f));
+        Fill(new Rect(r.x, r.y, r.width, 3), Accent);
+        float x = r.x + 30, iw = pw - 60, y = r.y + 20;
+        GUI.Label(new Rect(x, y, iw, 40), "PAUSED", h2Style);
+        y += 54;
+        if (GUI.Button(new Rect(x, y, iw, 50), "RESUME", bigButtonStyle)) { confirmLeave = false; SetCursorCaptured(true); }
+        y += 64;
+
+        if (online)
         {
-            GUIUtility.systemCopyBuffer = RelayConnect.Code;
-            codeCopiedTime = Time.unscaledTime;
+            GUI.Label(new Rect(x, y, 120, 34), "JOIN CODE", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleLeft });
+            GUI.Label(new Rect(x + 96, y - 2, 150, 38), $"<b>{RelayConnect.Code}</b>", new GUIStyle(h3Style) { fontSize = 24, richText = true });
+            var copyStyle = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 14 };
+            if (GUI.Button(new Rect(x + iw - 110, y, 110, 34), Time.unscaledTime - codeCopiedTime < 1.5f ? "COPIED!" : "COPY", copyStyle))
+            {
+                GUIUtility.systemCopyBuffer = RelayConnect.Code;
+                codeCopiedTime = Time.unscaledTime;
+            }
+            y += 54;
         }
+
+        // Quick settings (same values as the main menu's Settings tab).
+        var rr = new Rect(x, y, iw, 0);
+        bool changed = false;
+        CompactSlider(ref y, rr, "MOUSE SENSITIVITY", ref GameSettings.Sensitivity, 0.02f, 0.4f, v => (v * 10f).ToString("0.00"), ref changed);
+        CompactSlider(ref y, rr, "FIELD OF VIEW", ref GameSettings.Fov, 60f, 100f, v => $"{v:0}°", ref changed);
+        CompactSlider(ref y, rr, "MASTER VOLUME", ref GameSettings.Volume, 0f, 1f, v => $"{v * 100f:0}%", ref changed);
+        if (changed) GameSettings.Save();
+        y += 6;
+
+        float half = (iw - 12) / 2f;
+        var secondary = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+        string leave = confirmLeave ? "CLICK TO CONFIRM" : Net.IsServer ? "END GAME" : "LEAVE GAME";
+        if (GUI.Button(new Rect(x, r.yMax - 70, half, 48), leave, confirmLeave ? navActiveStyle : secondary))
+        {
+            if (confirmLeave) { confirmLeave = false; Disconnect(); }
+            else confirmLeave = true;
+        }
+        if (GUI.Button(new Rect(x + half + 12, r.yMax - 70, half, 48), "QUIT TO DESKTOP", secondary)) QuitGame();
+    }
+
+    void CompactSlider(ref float y, Rect r, string text, ref float value, float min, float max, Func<float, string> fmt, ref bool changed)
+    {
+        GUI.Label(new Rect(r.x, y, 260, 20), text, smallStyle);
+        GUI.Label(new Rect(r.x + r.width - 90, y - 4, 90, 26), fmt(value), valueStyle);
+        float v = GUI.HorizontalSlider(new Rect(r.x, y + 26, r.width, 20), value, min, max);
+        if (!Mathf.Approximately(v, value)) { value = v; changed = true; }
+        y += 58;
+    }
+
+    /// <summary>Waiting for the host to accept us (or for Relay): spinner, status and Cancel.</summary>
+    void DrawConnecting(float w, float h)
+    {
+        EnsureMenuStyles();
+        Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.5f));
+        var r = new Rect(w / 2 - 200, h / 2 - 90, 400, 180);
+        Fill(r, new Color(0.04f, 0.05f, 0.07f, 0.94f));
+        Fill(new Rect(r.x, r.y, r.width, 3), Accent);
+        string dots = new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
+        GUI.Label(new Rect(r.x, r.y + 30, r.width, 40), $"CONNECTING{dots}", new GUIStyle(h3Style) { alignment = TextAnchor.MiddleCenter, fontSize = 24 });
+        GUI.Label(new Rect(r.x, r.y + 70, r.width, 24), RelayConnect.Code != "" ? $"Joining game {RelayConnect.Code}" : $"Joining {address}",
+            new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter });
+        var cancel = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+        if (GUI.Button(new Rect(r.x + 120, r.yMax - 62, 160, 42), "CANCEL", cancel))
+            Disconnect();
     }
 
     void DrawHitMarker(float cx, float cy, Color c)

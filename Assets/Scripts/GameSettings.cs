@@ -10,6 +10,7 @@ public static class GameSettings
     public static float Volume = 1f;
     public static float GoreLevel = 2f;
     public static int Map; // map the host starts (MapCatalog index)
+    public static bool VSync = true;
     public static bool HostOnline = true; // host through Unity Relay (join code) instead of a direct IP
 
     public static void Load()
@@ -22,6 +23,7 @@ public static class GameSettings
         GoreLevel = PlayerPrefs.GetFloat("ffa.gore", 2f);
         Map = Mathf.Max(0, PlayerPrefs.GetInt("ffa.map", 0));
         HostOnline = PlayerPrefs.GetInt("ffa.hostonline", 1) != 0;
+        VSync = PlayerPrefs.GetInt("ffa.vsync", 1) != 0;
         Apply();
     }
 
@@ -35,6 +37,7 @@ public static class GameSettings
         PlayerPrefs.SetFloat("ffa.gore", GoreLevel);
         PlayerPrefs.SetInt("ffa.map", Map);
         PlayerPrefs.SetInt("ffa.hostonline", HostOnline ? 1 : 0);
+        PlayerPrefs.SetInt("ffa.vsync", VSync ? 1 : 0);
         PlayerPrefs.Save();
         Apply();
     }
@@ -42,6 +45,8 @@ public static class GameSettings
     public static void Apply()
     {
         AudioListener.volume = Volume;
+        QualitySettings.vSyncCount = VSync ? 1 : 0;
+        if (!VSync) Application.targetFrameRate = 240;
         Gore.Multiplier = GoreLevel;
     }
 

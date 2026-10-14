@@ -92,7 +92,7 @@ public partial class GameUI
         if (GUI.Button(new Rect(48, y, 304, 52), "QUIT", navStyle)) QuitGame();
 
         GUI.Label(new Rect(50, h - 96, 330, 80),
-            "WASD move · Shift sprint · Space jump\nCtrl crouch / slide · Z prone · Q/E lean\nG hook · T grenade · F pick up · R reload\nTab scores · Esc menu · F1 dev panel",
+            "WASD move · Shift sprint · Space jump\nCtrl crouch / slide · Z prone · Q/E lean\nG hook · T grenade · F pick up · R reload\nTab scores · Esc menu" + (DevPanel.Enabled ? " · F1 dev panel" : ""),
             new GUIStyle(smallStyle) { fontStyle = FontStyle.Normal, wordWrap = true });
 
         var panel = new Rect(450, 84, Mathf.Min(w - 500, 780), h - 160);
@@ -105,7 +105,7 @@ public partial class GameUI
             case MenuTab.Customize: DrawCustomizeTab(inner); break;
             case MenuTab.Settings: DrawSettingsTab(inner); break;
         }
-        GUI.Label(new Rect(w - 160, h - 30, 150, 22), "v1.0", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleRight });
+        GUI.Label(new Rect(w - 260, h - 30, 250, 22), $"PUBLIC BETA  ·  v{Application.version}", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleRight });
     }
 
     void Nav(ref float y, string text, MenuTab t)
@@ -166,7 +166,12 @@ public partial class GameUI
         Fill(joinRect, new Color(1f, 1f, 1f, 0.04f));
         GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 14, col - 36, 26), "JOIN A GAME", h3Style);
         GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 46, 200, 20), "JOIN CODE OR ADDRESS", smallStyle);
-        address = GUI.TextField(new Rect(joinRect.x + 18, joinRect.y + 68, col - 130, 40), address, 64, fieldStyle);
+        var addressRect = new Rect(joinRect.x + 18, joinRect.y + 68, col - 130, 40);
+        GUI.SetNextControlName("JoinAddress");
+        address = GUI.TextField(addressRect, address, 64, fieldStyle);
+        if (address.Length == 0 && GUI.GetNameOfFocusedControl() != "JoinAddress")
+            GUI.Label(new Rect(addressRect.x + 13, addressRect.y, addressRect.width - 20, addressRect.height), "Code or IP address",
+                new GUIStyle(fieldStyle) { normal = { background = null, textColor = new Color(1f, 1f, 1f, 0.3f) } });
         bool byCode = RelayConnect.LooksLikeJoinCode(address);
         GUI.enabled = !byCode;
         GUI.Label(new Rect(joinRect.x + col - 102, joinRect.y + 46, 80, 20), "PORT", smallStyle);
@@ -347,6 +352,20 @@ public partial class GameUI
         Slider(ref y, r, "FIELD OF VIEW", ref GameSettings.Fov, 60f, 100f, v => $"{v:0}°", ref changed);
         Slider(ref y, r, "MASTER VOLUME", ref GameSettings.Volume, 0f, 1f, v => $"{v * 100f:0}%", ref changed);
         Slider(ref y, r, "GORE LEVEL", ref GameSettings.GoreLevel, 0.5f, 4f, v => $"{v:0.0}x", ref changed);
+        // Display: fullscreen / windowed (Unity remembers the mode itself) and vsync.
+        float half = (r.width - 120 - 12) / 2f;
+        GUI.Label(new Rect(r.x, y, 300, 20), "DISPLAY", smallStyle);
+        bool full = Screen.fullScreenMode != FullScreenMode.Windowed;
+        if (GUI.Button(new Rect(r.x, y + 24, half / 2f - 4, 36), "FULLSCREEN", full ? mapButtonActiveStyle : mapButtonStyle) && !full)
+            Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
+        if (GUI.Button(new Rect(r.x + half / 2f + 4, y + 24, half / 2f - 4, 36), "WINDOWED", full ? mapButtonStyle : mapButtonActiveStyle) && full)
+            Screen.fullScreenMode = FullScreenMode.Windowed;
+        GUI.Label(new Rect(r.x + half + 12, y, 300, 20), "VSYNC", smallStyle);
+        if (GUI.Button(new Rect(r.x + half + 12, y + 24, half / 2f - 4, 36), "ON", GameSettings.VSync ? mapButtonActiveStyle : mapButtonStyle) && !GameSettings.VSync)
+        { GameSettings.VSync = true; changed = true; }
+        if (GUI.Button(new Rect(r.x + half + 12 + half / 2f + 4, y + 24, half / 2f - 4, 36), "OFF", GameSettings.VSync ? mapButtonStyle : mapButtonActiveStyle) && GameSettings.VSync)
+        { GameSettings.VSync = false; changed = true; }
+        y += 76;
         if (changed) GameSettings.Save();
         if (GUI.Button(new Rect(r.x, y + 10, 300, 46), "RESET TO DEFAULTS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
             GameSettings.ResetToDefaults();

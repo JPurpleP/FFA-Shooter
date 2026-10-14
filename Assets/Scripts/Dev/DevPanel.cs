@@ -16,6 +16,8 @@ using UnityEngine.InputSystem;
 public class DevPanel : MonoBehaviour
 {
     public static bool Open { get; private set; }
+    /// <summary>F1 panel (god mode, give weapons, bots...) only in the editor, development builds or with -ffadev.</summary>
+    public static bool Enabled => Application.isEditor || Debug.isDebugBuild || System.Environment.GetCommandLineArgs().Contains("-ffadev");
 
     Vector2 scroll;
     int goreWeapon = (int)WeaponId.BarrettM82;
@@ -125,7 +127,7 @@ public class DevPanel : MonoBehaviour
     void Update()
     {
         var kb = Keyboard.current;
-        if (kb != null && kb.f1Key.wasPressedThisFrame && FpsPlayer.Local != null)
+        if (kb != null && kb.f1Key.wasPressedThisFrame && FpsPlayer.Local != null && Enabled)
         {
             Open = !Open;
             GameUI.OnDevPanelToggled(Open);

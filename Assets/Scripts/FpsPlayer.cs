@@ -42,7 +42,7 @@ public struct PlayerInput
     public Vector2 Move, Look;
     public bool AbsoluteLook;
     public float Yaw, Pitch;
-    public bool Sprint, Jump, FireHeld, FirePressed, Aim, Reload, Interact;
+    public bool Sprint, Jump, JumpHeld, FireHeld, FirePressed, Aim, Reload, Interact;
     public float Lean; // -1 = left, +1 = right
     public bool Grapple; // fire / release the grappling hook
     public bool CrouchDown, CrouchHeld, ProneToggle; // Ctrl (slide / crouch), Z (prone)
@@ -82,17 +82,27 @@ public class FpsPlayer : NetworkBehaviour
     public readonly NetworkVariable<int> Kills = new();
     public readonly NetworkVariable<int> Deaths = new();
     public readonly NetworkVariable<bool> IsBot = new();
-    // Killstreaks: kills since your last death. 5 in a row = ESP for 30 s, 10 in a row = aimbot for 30 s.
-    public const int EspStreak = 5, AimbotStreak = 10;
+    // Killstreaks: kills since your last death, each reward lasting 30 s:
+    // 3 = speed hack (double move speed), 5 = ESP, 8 = flyhack, 10 = aimbot.
+    public const int SpeedStreak = 3, EspStreak = 5, FlyStreak = 8, AimbotStreak = 10;
+    public const float SpeedHackMultiplier = 2f, FlySpeed = 9f, FlyCeiling = 45f;
     public const float StreakRewardSeconds = 30f;
     public readonly NetworkVariable<int> Streak = new();
     public readonly NetworkVariable<double> EspUntil = new();      // server time the ESP runs out
     public readonly NetworkVariable<double> AimbotUntil = new();   // server time the aimbot runs out
+    public readonly NetworkVariable<double> SpeedUntil = new();    // server time the speed hack runs out
+    public readonly NetworkVariable<double> FlyUntil = new();      // server time the flyhack runs out
     double ServerNow => NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0;
     public bool EspActive => IsSpawned && ServerNow < EspUntil.Value;
     public bool AimbotActive => IsSpawned && ServerNow < AimbotUntil.Value;
     public float EspSecondsLeft => EspActive ? (float)(EspUntil.Value - ServerNow) : 0f;
     public float AimbotSecondsLeft => AimbotActive ? (float)(AimbotUntil.Value - ServerNow) : 0f;
+    public bool SpeedActive => IsSpawned && ServerNow < SpeedUntil.Value;
+    public bool FlyActive => IsSpawned && ServerNow < FlyUntil.Value;
+    public float SpeedSecondsLeft => SpeedActive ? (float)(SpeedUntil.Value - ServerNow) : 0f;
+    public float FlySecondsLeft => FlyActive ? (float)(FlyUntil.Value - ServerNow) : 0f;
+    /// <summary>Flying right now (flyhack, alive, not in a duel; humans only, bots stay on their nav graph).</summary>
+    bool Flying => FlyActive && !IsDead && !InDuel && brain == null;
     // Spawn protection: can't be hurt for a few seconds after spawning, until you move or fire.
     public const float SpawnProtectSeconds = 3f;
     public readonly NetworkVariable<bool> Protected = new(); // server written; off when it runs out or is broken
@@ -213,7 +223,7 @@ public class FpsPlayer : NetworkBehaviour
     Stance appliedShape = (Stance)255;
 
     // Grappling hook (owner state; anchor is mirrored in netGrapple for everyone's rope visuals)
-    public const float GrappleRange = 45f, GrappleSpeed = 24f, GrappleAccel = 70f, GrappleCooldown = 2.5f, RopeShootTime = 0.12f;
+    public const float GrappleRange = 30f, GrappleSpeed = 24f, GrappleAccel = 70f, GrappleCooldown = 2.5f, RopeShootTime = 0.12f;
     bool grappling;
     Vector3 grappleAnchor, momentum;
     float grappleStart, grappleReadyAt;
@@ -428,17 +438,36 @@ public class FpsPlayer : NetworkBehaviour
         // Move
         if (alive && controller.enabled)
         {
-            UpdateStance(input);
+            if (Flying)
+            {
+                if (sliding) EndSlide(false);
+                if (stance != Stance.Stand) TrySetStance(Stance.Stand);
+            }
+            else
+                UpdateStance(input);
             float speedScale = def != null ? def.MoveSpeedScale : 1f;
             speedScale *= Mathf.Lerp(1f, 0.55f, adsT) * Mathf.Lerp(1f, 0.6f, Mathf.Abs(lean));
             speedScale *= stance == Stance.Prone ? 0.24f : stance == Stance.Crouch ? 0.55f : 1f;
             bool sprint = input.Sprint && input.Move.y > 0.1f && adsT < 0.2f && stance == Stance.Stand;
             Vector3 move = transform.TransformDirection(Vector3.ClampMagnitude(new Vector3(input.Move.x, 0f, input.Move.y), 1f))
                            * (sprint ? sprintSpeed : walkSpeed) * speedScale;
+            if (SpeedActive && !InDuel) move *= SpeedHackMultiplier; // speed hack (slides inherit the doubled speed)
             if (sliding)
                 move = slideDir * slideSpeed + move * 0.12f; // momentum carries you; a touch of steering
             UpdateGrapple(input, ref move);
-            if (!grappling)
+            if (Flying && !grappling)
+            {
+                // Flyhack: no gravity; Space rises, Ctrl sinks. Kept under a ceiling and inside the map.
+                float lift = (input.JumpHeld ? 1f : 0f) - (input.CrouchHeld ? 1f : 0f);
+                verticalVelocity = Mathf.MoveTowards(verticalVelocity, lift * FlySpeed, 40f * Time.deltaTime);
+                if (transform.position.y > FlyCeiling && verticalVelocity > 0f) verticalVelocity = 0f;
+                var b = BotNav.Bounds;
+                Vector3 p = transform.position, flat = move + momentum;
+                if ((p.x < b.xMin && flat.x < 0f) || (p.x > b.xMax && flat.x > 0f)) { move.x = 0f; momentum.x = 0f; }
+                if ((p.z < b.yMin && flat.z < 0f) || (p.z > b.yMax && flat.z > 0f)) { move.z = 0f; momentum.z = 0f; }
+                momentum = Vector3.MoveTowards(momentum, Vector3.zero, 6f * Time.deltaTime);
+            }
+            else if (!grappling)
             {
                 if (controller.isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
                 if (input.Jump && controller.isGrounded)
@@ -515,6 +544,7 @@ public class FpsPlayer : NetworkBehaviour
             if (kb.aKey.isPressed) input.Move.x -= 1f;
             input.Sprint = kb.leftShiftKey.isPressed;
             input.Jump = kb.spaceKey.wasPressedThisFrame;
+            input.JumpHeld = kb.spaceKey.isPressed;
             input.Reload = kb.rKey.wasPressedThisFrame;
             input.Interact = kb.fKey.wasPressedThisFrame;
             input.Grapple = kb.gKey.wasPressedThisFrame;
@@ -1318,7 +1348,19 @@ public class FpsPlayer : NetworkBehaviour
     public void ServerAddStreak()
     {
         Streak.Value++;
-        if (Streak.Value == EspStreak)
+        if (Streak.Value == SpeedStreak)
+        {
+            SpeedUntil.Value = ServerNow + StreakRewardSeconds;
+            BroadcastKillFeed(new FixedString128Bytes($"{DisplayName} is on a {SpeedStreak}-kill streak: SPEED HACK"));
+            StreakRewardRpc(3);
+        }
+        else if (Streak.Value == FlyStreak)
+        {
+            FlyUntil.Value = ServerNow + StreakRewardSeconds;
+            BroadcastKillFeed(new FixedString128Bytes($"{DisplayName} is on a {FlyStreak}-kill streak: FLYHACK"));
+            StreakRewardRpc(4);
+        }
+        else if (Streak.Value == EspStreak)
         {
             EspUntil.Value = ServerNow + StreakRewardSeconds;
             BroadcastKillFeed(new FixedString128Bytes($"{DisplayName} is on a {EspStreak}-kill streak: ESP"));
@@ -1337,13 +1379,17 @@ public class FpsPlayer : NetworkBehaviour
         Streak.Value = 0;
         EspUntil.Value = 0;
         AimbotUntil.Value = 0;
+        SpeedUntil.Value = 0;
+        FlyUntil.Value = 0;
     }
 
     [Rpc(SendTo.Owner)]
     void StreakRewardRpc(int reward)
     {
         if (!IsLocalHuman) return;
-        if (reward == 1) GameUI.ShowBanner($"{EspStreak} KILL STREAK: ESP", "See every enemy through walls for 30 s", new Color(0.35f, 1f, 0.55f));
+        if (reward == 3) GameUI.ShowBanner($"{SpeedStreak} KILL STREAK: SPEED HACK", "Double running, walking and sliding speed for 30 s", new Color(1f, 0.85f, 0.25f));
+        else if (reward == 4) GameUI.ShowBanner($"{FlyStreak} KILL STREAK: FLYHACK", "Fly for 30 s: Space to rise, Ctrl to sink", new Color(0.6f, 0.75f, 1f));
+        else if (reward == 1) GameUI.ShowBanner($"{EspStreak} KILL STREAK: ESP", "See every enemy through walls for 30 s", new Color(0.35f, 1f, 0.55f));
         else GameUI.ShowBanner($"{AimbotStreak} KILL STREAK: AIMBOT", "Your aim locks onto enemies in view for 30 s", new Color(1f, 0.3f, 0.25f));
         audioSource.PlayOneShot(Sfx.Bell, 0.6f);
     }
@@ -1897,6 +1943,12 @@ public class FpsPlayer : NetworkBehaviour
     {
         testStanceTimer += Time.deltaTime;
         int mode = GameUI.TestStance;
+        if (mode == 5)
+        {
+            // Flyhack: hold Space for 2 s, then hover.
+            input.JumpHeld = testStanceTimer > 0.5f && testStanceTimer < 2.5f;
+            return input;
+        }
         if (mode == 4)
         {
             // Air slide: sprint, jump, hold Ctrl in the air and keep holding through the landing.
