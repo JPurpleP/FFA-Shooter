@@ -11,6 +11,7 @@ public static class GameSettings
     public static float GoreLevel = 2f;
     public static int HostBots;
     public static int Map; // map the host starts (MapCatalog index)
+    public static bool HostOnline = true; // host through Unity Relay (join code) instead of a direct IP
 
     public static void Load()
     {
@@ -22,6 +23,7 @@ public static class GameSettings
         GoreLevel = PlayerPrefs.GetFloat("ffa.gore", 2f);
         HostBots = PlayerPrefs.GetInt("ffa.hostbots", 0);
         Map = Mathf.Max(0, PlayerPrefs.GetInt("ffa.map", 0));
+        HostOnline = PlayerPrefs.GetInt("ffa.hostonline", 1) != 0;
         Apply();
     }
 
@@ -35,6 +37,7 @@ public static class GameSettings
         PlayerPrefs.SetFloat("ffa.gore", GoreLevel);
         PlayerPrefs.SetInt("ffa.hostbots", HostBots);
         PlayerPrefs.SetInt("ffa.map", Map);
+        PlayerPrefs.SetInt("ffa.hostonline", HostOnline ? 1 : 0);
         PlayerPrefs.Save();
         Apply();
     }

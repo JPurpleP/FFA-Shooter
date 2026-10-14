@@ -11,7 +11,8 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Main menu (host / join), in-game HUD, scoreboard and pause menu, drawn with IMGUI.
 /// Also reads command-line flags for quick testing:
-///   -ffahost | -ffaclient &lt;ip&gt;   start immediately
+///   -ffahost | -ffarelay | -ffaclient &lt;ip or join code&gt;   start immediately (-ffarelay hosts online with a join code)
+///   -ffaprofile &lt;name&gt;   separate Unity services sign-in, for several copies on one PC
 ///   -ffaname &lt;name&gt;  -ffaport &lt;port&gt;
 ///   -ffaautotest   the local player aims and fires at the nearest enemy by itself
 ///   -ffaquitafter &lt;seconds&gt;   -ffascreenshot &lt;png path&gt; (taken after 4 seconds)
@@ -319,8 +320,8 @@ public partial class GameUI : MonoBehaviour
             mapOverride = Mathf.Clamp(testMap, 0, MapCatalog.Count - 1);
             MapCatalog.Apply(HostMap);
         }
-        if (args.Contains("-ffahost"))
-            Host();
+        if (args.Contains("-ffahost") || args.Contains("-ffarelay"))
+            Host(args.Contains("-ffarelay"));
         else if (Arg("-ffaclient") is { } ip)
         {
             address = ip;
@@ -371,7 +372,8 @@ public partial class GameUI : MonoBehaviour
             return;
         }
         MapCatalog.Apply(HostMap); // back to our own pick behind the menu
-        status = string.IsNullOrEmpty(Net.DisconnectReason)
+        RelayConnect.ClearCode();
+        status =string.IsNullOrEmpty(Net.DisconnectReason)
             ? (wasInGame ? "Disconnected from host." : "Could not connect to host.")
             : Net.DisconnectReason;
         Debug.Log($"[FFA] {status}");
@@ -382,27 +384,62 @@ public partial class GameUI : MonoBehaviour
     int mapOverride = -1;
     int HostMap => mapOverride >= 0 ? mapOverride : GameSettings.Map;
 
-    void Host()
+    bool connecting; // waiting on Unity Relay (sign-in / allocation) before the session starts
+
+    /// <param name="online">Host through Unity Relay and show a join code; otherwise listen on the port for direct IP joins.</param>
+    /// <param name="bots">Fighter bots to add once the host's player has spawned.</param>
+    async void Host(bool online, int bots = 0)
     {
-        if (!TryGetPort(out ushort p)) return;
+        if (connecting || InSession) return;
+        ushort p = 0;
+        if (!online && !TryGetPort(out p)) return;
         LocalPlayerName = SanitizeName(LocalPlayerName);
         MapCatalog.Apply(HostMap);
-        Net.GetComponent<UnityTransport>().SetConnectionData("127.0.0.1", p, "0.0.0.0");
-        status = Net.StartHost() ? "" : $"Could not host on port {p} (already in use?)";
-        Debug.Log($"[FFA] Hosting on port {p}: {(status == "" ? "ok" : status)}");
+        var transport = Net.GetComponent<UnityTransport>();
+        RelayConnect.ClearCode();
+        if (online)
+        {
+            connecting = true;
+            status = "Going online…";
+            try { await RelayConnect.PrepareHost(transport); }
+            catch (Exception e) { status = RelayConnect.Describe(e); return; }
+            finally { connecting = false; }
+        }
+        else
+            transport.SetConnectionData("127.0.0.1", p, "0.0.0.0");
+        status = Net.StartHost() ? "" : online ? "Could not start the online game." : $"Could not host on port {p} (already in use?)";
+        if (status != "") RelayConnect.ClearCode();
+        Debug.Log(online ? $"[FFA] Hosting online, join code {RelayConnect.Code}: {(status == "" ? "ok" : status)}"
+                         : $"[FFA] Hosting on port {p}: {(status == "" ? "ok" : status)}");
+        if (status == "" && bots > 0) StartCoroutine(SpawnHostBots(bots));
     }
 
-    void Join()
+    async void Join()
     {
-        if (!TryGetPort(out ushort p)) return;
+        if (connecting || InSession) return;
         LocalPlayerName = SanitizeName(LocalPlayerName);
-        string ip = ResolveIPv4(address.Trim());
+        var transport = Net.GetComponent<UnityTransport>();
+        RelayConnect.ClearCode();
+        string target = address.Trim();
+        if (RelayConnect.LooksLikeJoinCode(target))
+        {
+            connecting = true;
+            status = "Finding game…";
+            try { await RelayConnect.PrepareJoin(transport, target); }
+            catch (Exception e) { status = RelayConnect.Describe(e); return; }
+            finally { connecting = false; }
+            status = Net.StartClient() ? "" : "Could not start client.";
+            Debug.Log($"[FFA] Joining online game {RelayConnect.Code}");
+            return;
+        }
+        if (!TryGetPort(out ushort p)) return;
+        string ip = ResolveIPv4(target);
         if (ip == null)
         {
             status = $"Unknown address '{address}'";
             return;
         }
-        Net.GetComponent<UnityTransport>().SetConnectionData(ip, p);
+        transport.SetConnectionData(ip, p);
         status = Net.StartClient() ? "" : "Could not start client.";
         Debug.Log($"[FFA] Joining {ip}:{p}");
     }
@@ -412,6 +449,7 @@ public partial class GameUI : MonoBehaviour
         GetComponent<MatchRules>()?.StopAllCoroutines();
         MatchRules.ResetState();
         Net.Shutdown();
+        RelayConnect.ClearCode();
         killFeed.Clear();
         Gore.ClearAll();
         DuelManager.ResetAll();
@@ -795,7 +833,8 @@ public partial class GameUI : MonoBehaviour
         Fill(r, new Color(0.03f, 0.04f, 0.06f, 0.82f));
         Fill(new Rect(r.x, r.y, bw, 3), new Color(1f, 0.82f, 0.3f, 0.9f));
         Shadowed(new Rect(r.x + 20, r.y + 12, 300, 30), "<b>LEADERBOARD</b>", new GUIStyle(label) { fontSize = 20 }, Color.white);
-        Shadowed(new Rect(r.x + bw - 320, r.y + 16, 300, 24), $"First to {MatchRules.FragLimit} kills wins",
+        string codeText = RelayConnect.Code != "" ? $"Join code <b>{RelayConnect.Code}</b>   ·   " : "";
+        Shadowed(new Rect(r.x + bw - 380, r.y + 16, 360, 24), $"{codeText}First to {MatchRules.FragLimit} kills wins",
             new GUIStyle(label) { alignment = TextAnchor.UpperRight, fontSize = 14 }, new Color(1f, 1f, 1f, 0.7f));
 
         float hy = r.y + 52;
@@ -836,13 +875,25 @@ public partial class GameUI : MonoBehaviour
         }
     }
 
+    float codeCopiedTime = -10f;
+
     void DrawPauseMenu(float w, float h)
     {
-        var r = new Rect(w / 2 - 120, h / 2 - 90, 240, 180);
+        bool online = RelayConnect.Code != "";
+        var r = new Rect(w / 2 - 120, h / 2 - 90, 240, online ? 260 : 180);
         GUI.Box(r, "Paused", boxStyle);
         if (GUI.Button(new Rect(r.x + 20, r.y + 35, 200, 36), "Resume")) SetCursorCaptured(true);
         if (GUI.Button(new Rect(r.x + 20, r.y + 80, 200, 36), Net.IsServer ? "End Game" : "Leave Game")) Disconnect();
         if (GUI.Button(new Rect(r.x + 20, r.y + 125, 200, 36), "Quit to Desktop")) QuitGame();
+        if (!online) return;
+        // Join code to invite friends (anyone in an online game can share it).
+        Shadowed(new Rect(r.x + 20, r.y + 170, 200, 22), $"JOIN CODE  <b><size=20>{RelayConnect.Code}</size></b>",
+            new GUIStyle(label) { alignment = TextAnchor.MiddleCenter, fontSize = 13 }, Color.white);
+        if (GUI.Button(new Rect(r.x + 20, r.y + 204, 200, 36), Time.unscaledTime - codeCopiedTime < 1.5f ? "Copied!" : "Copy Join Code"))
+        {
+            GUIUtility.systemCopyBuffer = RelayConnect.Code;
+            codeCopiedTime = Time.unscaledTime;
+        }
     }
 
     void DrawHitMarker(float cx, float cy, Color c)

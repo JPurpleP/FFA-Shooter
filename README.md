@@ -8,11 +8,11 @@ lookout tower on the west ridge, ranger station and deer stand on the east one) 
 city grid (three streets × three avenues, 16 blocks): walk-in brick shops and apartments with stairs to the roofs, office
 and hotel tower lobbies, a two-level parking garage with ramps, a construction site with a crane, a warehouse with a
 mezzanine, a gas station, a fountain plaza and a basketball court, ringed by a skyline. Unity 6000.6, Built-in render pipeline,
-Netcode for GameObjects 2.13 + Unity Transport (direct IP, host/client). Everything visual (map, weapons,
+Netcode for GameObjects 2.13 + Unity Transport (host/client, online through Unity Relay or direct IP). Everything visual (map, weapons,
 bodies, gore, sounds) is generated from code — no imported art or audio.
 
 ## Play
-- Run `Builds/Windows/FFA-Shooter.exe`. Main menu: **Play** (name, Host with a map choice and optional bots, Join by address/port —
+- Run `Builds/Windows/FFA-Shooter.exe`. Main menu: **Play** (name, Host with a map choice and optional bots, Join —
   joiners load whatever map the host picked),
   **Customize** (skins with a live 3D preview: Original, Rainbow, Hi-Vis Worker, Tactical, Chef, Clown,
   Banana Suit, Astronaut, Cowboy, Pirate, Alien, Luchador, Tourist,
@@ -20,6 +20,10 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   Office Dad, Suburban Dad, Hitman, Street OG, Disco King, Ninja, Viking, Knight, Mime, Skater, Farmer, Lumberjack, Surgeon,
   Firefighter, Hazmat, WW2 German Soldier — 32 in all), **Settings** (sensitivity,
   field of view, volume, gore level). Choices are saved between launches; your skin syncs to everyone online.
+- **Online vs LAN.** Hosting **Online** goes through Unity Relay: the host gets a 6-letter join code (shown in the Esc menu,
+  with a copy button, and on the Tab leaderboard), friends type it into Join. No port forwarding, no IP addresses shared.
+  **LAN / Direct IP** listens on the port as before; friends type your address. Join accepts either a code or an address.
+  Online needs the project linked to Unity Gaming Services with Relay enabled (see *Online setup* below).
 - First to 25 kills wins; scores reset after 8 seconds. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
 - Controls: WASD · Shift sprint · Space jump · LMB fire · RMB aim (scope on the Barrett) · **Q/E lean** · R reload ·
   F pick up / swap · 1/2 or mouse wheel to switch · Tab scores · Esc menu · **F1 dev panel**
@@ -101,7 +105,8 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   -ffamap <0-2>    host Kirktown / Timberline / Downtown (not saved)
   -ffastreak <n>   start with an n-kill streak   -ffaturn <deg>  swing the view   -ffahook  start with the grappling hook
   -ffabackground [-ffareturnfocus <hwnd>]   test window that never takes focus or the mouse (pair with -monitor 2)
-  -ffahost | -ffaclient <ip>   -ffaname <n>  -ffaport <p>  -ffaquitafter <s>
+  -ffahost | -ffarelay | -ffaclient <ip or join code>   -ffaname <n>  -ffaport <p>  -ffaquitafter <s>
+  -ffaprofile <name>   separate Unity services sign-in (several online copies on one PC)
   -ffabots <n> [Dummy|Strafer|Turret|Fighter]   spawn bots after hosting
   -ffaautotest     the local player is driven by the Fighter bot AI (logs scores)
   -ffagive <0-4>   start with a weapon    -ffaaim  hold aim-down-sights    -ffalean <-1..1>  hold a lean
@@ -127,3 +132,10 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   builds Timberline (heightmap ground mesh, generated tree/rock meshes, cabins, lookout); `ProjectBuilder.City.cs`
   builds Downtown (metre-scaled facade/brick meshes via `metricTile`, walk-in shops, garage, construction site). Re-run **FFA > Rebuild Arena**
   after changing it (overwrites `Assets/Generated` and the scene). Build: `-executeMethod ProjectBuilder.BuildWindows`.
+
+## Online setup (one time)
+1. Open the project in Unity 6000.6.5f1 and sign in with your Unity account.
+2. **Edit > Project Settings > Services**: pick your organization and **Create project ID** (or link an existing one).
+3. At [cloud.unity.com](https://cloud.unity.com), open that project and enable **Relay** (free tier: 50 concurrent players/month avg).
+4. Rebuild. Until this is done, Online hosting shows "Online play isn't set up yet" — LAN / Direct IP still works.
+- Code: `Assets/Scripts/RelayConnect.cs` (anonymous sign-in, allocation, join codes, error messages); `GameUI.Host/Join`.
