@@ -276,6 +276,10 @@ public class DevPanel : MonoBehaviour
         for (int i = 0; i < WeaponDefs.Count; i++)
             if (GUILayout.Button(Short(i)) && IsHost && FpsPlayer.Local != null) FpsPlayer.Local.ServerGiveWeapon((WeaponId)i);
         GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        foreach (var t in WeaponDefs.Throwables) // grenades (slot 3)
+            if (GUILayout.Button(Short((int)t)) && IsHost && FpsPlayer.Local != null) FpsPlayer.Local.ServerGiveWeapon(t);
+        GUILayout.EndHorizontal();
         DevSettings.GodMode = GUILayout.Toggle(DevSettings.GodMode, "God mode (host)");
         DevSettings.InfiniteAmmo = GUILayout.Toggle(DevSettings.InfiniteAmmo, "Infinite ammo");
         DevSettings.NoGrappleCooldown = GUILayout.Toggle(DevSettings.NoGrappleCooldown, "No grappling hook cooldown");
@@ -332,6 +336,9 @@ public class DevPanel : MonoBehaviour
         WeaponId.M32 => "M32",
         WeaponId.RPG7 => "RPG",
         WeaponId.FragGrenade => "Frags",
+        WeaponId.SmokeGrenade => "Smoke",
+        WeaponId.RopeGrenade => "Rope",
+        WeaponId.Molotov => "Molotov",
         WeaponId.AA12 => "AA-12",
         WeaponId.Mosin => "Mosin",
         WeaponId.PPSh41 => "PPSh",
