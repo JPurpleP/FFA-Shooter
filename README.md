@@ -64,7 +64,7 @@ aim / hunting you through walls / speed; bots don't fly).
 | Mosin-Nagant | 5 (+20) | bolt action, iron sights, one-shot headshot |
 | Barrett M82A1 | 10 (+30) | scoped, one-shot body |
 | M32 MGL | 6 (+6) | 40mm grenades in an arc, red dot |
-| RPG-7 | 1 (+3) | fast rocket, big blast, backblast |
+| RPG-7 | 1 (+2) | fast rocket, big blast, backblast |
 | Frag grenade | start with 2, max 4 | slot 3; cook while held (3.2 s fuse), release to throw; bounces |
 | Smoke grenade | max 2 | slot 3; a thick cloud for ~16 s that also blinds bots and the aimbot |
 | Rope grenade | max 2 | slot 3; after 1.3 s it tethers everyone in sight within 15 m to where it landed for 10 s: they move freely but can't get any farther from it than they were |

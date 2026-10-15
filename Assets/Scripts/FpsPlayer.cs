@@ -1379,6 +1379,7 @@ public class FpsPlayer : NetworkBehaviour
             WeaponPickup.Spawn((WeaponId)cur.Weapon(slot), cur.Mag(slot), cur.Reserve(slot), pickup.transform.position, null, 30f);
             GiveWeaponRpc(slot, weapon, mag, reserve);
         }
+        Debug.Log($"[FFA] Pickup: {DisplayName} took {WeaponDefs.Get(weapon)?.Name}");
         pickup.Despawn();
     }
 

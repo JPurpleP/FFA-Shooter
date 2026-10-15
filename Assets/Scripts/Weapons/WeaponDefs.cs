@@ -155,10 +155,10 @@ public static class WeaponDefs
         new WeaponDef
         {
             Id = WeaponId.Remington870, Name = "Remington 870", Caliber = "12 gauge",
-            Damage = 19, Pellets = 9, HeadMultiplier = 1.5f, CloseBonus = 1.6f, CloseRange = 4f,
-            FalloffStart = 9f, FalloffEnd = 30f, MinDamageScale = 0.3f, Range = 60f,
+            Damage = 21, Pellets = 9, HeadMultiplier = 1.5f, CloseBonus = 1.6f, CloseRange = 4f,
+            FalloffStart = 14f, FalloffEnd = 40f, MinDamageScale = 0.35f, Range = 60f,
             FireInterval = 0.9f, MagSize = 6, ReloadTime = 0.5f, ReloadPerRound = true,
-            HipSpread = 4.5f, AdsSpread = 3.8f, BloomPerShot = 0f, RecoilKick = 9f, AdsFov = 60f,
+            HipSpread = 4f, AdsSpread = 2.8f, BloomPerShot = 0f, RecoilKick = 9f, AdsFov = 60f,
             RagdollImpulse = 380f, RagdollLift = 0.45f, RagdollSpin = 70f, DismemberPower = 2,
             HipOffset = new Vector3(0.17f, -0.2f, 0.24f), SightHeight = 0.1f, AdsDistance = 0.2f,
             LeftHand = new Vector3(0f, 0.01f, 0.33f), PickupGlow = new Color(1f, 0.55f, 0.15f), SoundPitch = 0.8f, TracerSpeed = 260f,
@@ -199,7 +199,7 @@ public static class WeaponDefs
             Id = WeaponId.RPG7, Name = "RPG-7", Caliber = "PG-7V",
             Damage = 200, Projectile = ProjectileKind.Rocket, ProjectileSpeed = 55f, ProjectileGravity = 0.12f,
             ExplosionRadius = 6.5f, ExplosionDamage = 210f,
-            FireInterval = 1f, MagSize = 1, SpareMags = 3, ReloadTime = 2.8f,
+            FireInterval = 1f, MagSize = 1, SpareMags = 2, ReloadTime = 2.8f,
             HipSpread = 2f, AdsSpread = 0.3f, BloomPerShot = 0f, RecoilKick = 5f, AdsFov = 55f, MoveSpeedScale = 0.85f,
             HipOffset = new Vector3(0.24f, -0.23f, 0.24f), SightHeight = 0.1495f, AdsDistance = 0.16f,
             LeftHand = new Vector3(0f, -0.06f, 0.18f), PickupGlow = new Color(1f, 0.15f, 0.1f), SoundPitch = 1f,
@@ -215,10 +215,10 @@ public static class WeaponDefs
         new WeaponDef
         {
             Id = WeaponId.AA12, Name = "AA-12", Caliber = "12 gauge",
-            Damage = 13, Pellets = 8, HeadMultiplier = 1.5f, CloseBonus = 1.4f, CloseRange = 3f,
-            FalloffStart = 8f, FalloffEnd = 25f, MinDamageScale = 0.3f, Range = 50f,
+            Damage = 15, Pellets = 8, HeadMultiplier = 1.5f, CloseBonus = 1.4f, CloseRange = 3f,
+            FalloffStart = 12f, FalloffEnd = 32f, MinDamageScale = 0.3f, Range = 50f,
             Automatic = true, FireInterval = 0.2f, MagSize = 20, SpareMags = 2, ReloadTime = 3f,
-            HipSpread = 5f, AdsSpread = 4.2f, BloomPerShot = 0.3f, RecoilKick = 5f, AdsFov = 62f, MoveSpeedScale = 0.92f,
+            HipSpread = 4.5f, AdsSpread = 3.2f, BloomPerShot = 0.3f, RecoilKick = 5f, AdsFov = 62f, MoveSpeedScale = 0.92f,
             RagdollImpulse = 330f, RagdollLift = 0.4f, RagdollSpin = 60f, DismemberPower = 2,
             HipOffset = new Vector3(0.18f, -0.22f, 0.24f), SightHeight = 0.147f, AdsDistance = 0.2f,
             LeftHand = new Vector3(0f, 0.022f, 0.38f), PickupGlow = new Color(1f, 0.35f, 0.35f), SoundPitch = 0.9f, TracerSpeed = 250f,
@@ -256,9 +256,9 @@ public static class WeaponDefs
         new WeaponDef
         {
             Id = WeaponId.Cattleman, Name = "Cattleman", Caliber = ".45 Colt",
-            Damage = 55, HeadMultiplier = 2.2f, FalloffStart = 25f, FalloffEnd = 60f, MinDamageScale = 0.7f, Range = 150f,
+            Damage = 60, HeadMultiplier = 2.2f, FalloffStart = 25f, FalloffEnd = 60f, MinDamageScale = 0.7f, Range = 150f,
             FireInterval = 0.5f, MagSize = 6, SpareMags = 4, ReloadTime = 0.45f, ReloadPerRound = true,
-            HipSpread = 1.6f, AdsSpread = 0.3f, BloomPerShot = 0.6f, RecoilKick = 8f, AdsFov = 60f, MoveSpeedScale = 1.03f,
+            HipSpread = 1.6f, AdsSpread = 0.3f, BloomPerShot = 0.4f, RecoilKick = 8f, AdsFov = 60f, MoveSpeedScale = 1.03f,
             RagdollImpulse = 260f, RagdollLift = 0.3f, RagdollSpin = 50f, DismemberPower = 1,
             HipOffset = new Vector3(0.13f, -0.15f, 0.4f), SightHeight = 0.066f, AdsDistance = 0.4f,
             LeftHand = new Vector3(-0.015f, -0.035f, 0.0f), PickupGlow = new Color(0.85f, 0.65f, 0.4f), SoundPitch = 0.85f, TracerSpeed = 330f,
@@ -277,7 +277,7 @@ public static class WeaponDefs
         {
             Id = WeaponId.LeverAction, Name = "Lever Action", Caliber = ".30-30 Win",
             Damage = 70, HeadMultiplier = 2.3f, Range = 300f,
-            FireInterval = 0.75f, MagSize = 7, SpareMags = 4, ReloadTime = 0.5f, ReloadPerRound = true,
+            FireInterval = 0.6f, MagSize = 7, SpareMags = 4, ReloadTime = 0.5f, ReloadPerRound = true,
             HipSpread = 3.5f, AdsSpread = 0.15f, BloomPerShot = 0f, RecoilKick = 8.5f, AdsFov = 52f, MoveSpeedScale = 0.97f,
             RagdollImpulse = 380f, RagdollLift = 0.4f, RagdollSpin = 70f, DismemberPower = 2,
             HipOffset = new Vector3(0.16f, -0.2f, 0.2f), SightHeight = 0.0755f, AdsDistance = 0.16f,
@@ -298,7 +298,7 @@ public static class WeaponDefs
             Id = WeaponId.GlockSwitch, Name = "Glock (switch)", Caliber = "9×19mm full auto",
             Damage = 18, FalloffStart = 12f, FalloffEnd = 35f, MinDamageScale = 0.6f,
             Automatic = true, FireInterval = 0.05f, MagSize = 33, SpareMags = 2, ReloadTime = 2f,
-            HipSpread = 3.5f, AdsSpread = 2.2f, BloomPerShot = 0.45f, RecoilKick = 0.4f, AdsFov = 64f, MoveSpeedScale = 1.05f,
+            HipSpread = 3.5f, AdsSpread = 1.6f, BloomPerShot = 0.25f, RecoilKick = 0.4f, AdsFov = 64f, MoveSpeedScale = 1.05f,
             RagdollImpulse = 75f, RagdollLift = 0.15f, RagdollSpin = 14f, DismemberPower = 0,
             HipOffset = new Vector3(0.1f, -0.13f, 0.42f), SightHeight = 0.064f, AdsDistance = 0.42f,
             OneHanded = true, CantDegrees = 90f,
@@ -317,7 +317,7 @@ public static class WeaponDefs
         new WeaponDef
         {
             Id = WeaponId.MP18, Name = "MP-18", Caliber = ".308 Win",
-            Damage = 110, HeadMultiplier = 2.5f, Range = 450f,
+            Damage = 95, HeadMultiplier = 2.5f, Range = 450f,
             FireInterval = 0.4f, MagSize = 1, SpareMags = 15, ReloadTime = 1.4f,
             HipSpread = 4f, AdsSpread = 0.05f, BloomPerShot = 0f, RecoilKick = 10f, AdsFov = 48f, MoveSpeedScale = 0.98f,
             RagdollImpulse = 520f, RagdollLift = 0.45f, RagdollSpin = 95f, DismemberPower = 2,
