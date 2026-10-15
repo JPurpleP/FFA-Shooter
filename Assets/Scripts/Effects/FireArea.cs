@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -8,6 +9,7 @@ using UnityEngine;
 public class FireArea : MonoBehaviour
 {
     const float Tick = 0.25f;
+    static readonly bool logHits = System.Environment.GetCommandLineArgs().Contains("-ffalogfire"); // tests
 
     FpsPlayer owner;
     bool server;
@@ -53,6 +55,7 @@ public class FireArea : MonoBehaviour
             };
             int dmg = Mathf.RoundToInt(WeaponDefs.FireDps * Tick);
             bool killed = p.TakeDamage(dmg, owner, info);
+            if (logHits) Debug.Log($"[FFA] Fire: {p.DisplayName} health {p.Health.Value}");
             if (owner != null && owner != p && owner.IsSpawned) owner.ServerConfirmHit(dmg, false, killed, chest);
         }
     }

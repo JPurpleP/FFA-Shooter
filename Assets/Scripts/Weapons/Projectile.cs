@@ -261,6 +261,7 @@ public class Projectile : NetworkBehaviour
         exploded = true;
         if (fragBody != null) fragBody.isKinematic = true;
         var def = Def;
+        if (Thrown) Debug.Log($"[FFA] {def?.Name} went off at {at:F1}");
         switch (Kind)
         {
             case ProjectileKind.Smoke:
