@@ -90,7 +90,7 @@ table (not the Glock); every weapon has an equal share except the golden Deagle,
 
 **Golden duel.** Hit someone with the golden Deagle and you're both pulled into a boxing ring in an underground fight
 club, at full health, fists only (LMB punches, hold to keep swinging; head punches hit harder). Fight to the death: after
-45 s sudden death makes you both bleed out. The winner goes back to exactly where they stood when the shot landed, at full
+45 s sudden death makes you both bleed out. The winner comes back at a random spawn point with spawn protection, at full
 health, with all their guns; the loser dies, their guns drop on the map where they were, and they respawn as usual. Up to
 four duels can run at once. Bots fight duels too (and go for the golden gun).
 
