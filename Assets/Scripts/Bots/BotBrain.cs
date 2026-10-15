@@ -203,6 +203,7 @@ public class BotBrain : MonoBehaviour
     {
         Vector3 from = me.Head.position;
         Vector3 to = p.transform.position + Vector3.up * 1.3f;
+        if (SmokeCloud.Blocks(from, to)) return false;
         if (!Physics.Raycast(from, to - from, out var hit, Vector3.Distance(from, to) + 0.5f, GameAssets.ShotMask, QueryTriggerInteraction.Ignore))
             return false;
         return hit.collider.GetComponentInParent<FpsPlayer>() == p;
@@ -277,7 +278,7 @@ public class BotBrain : MonoBehaviour
         float bestD = 45f;
         foreach (var p in WeaponPickup.All)
         {
-            if (!p.Available || p.Id == WeaponId.Glock17 || p.Id == WeaponId.FragGrenade || p.Id == WeaponId.GrappleHook) continue;
+            if (!p.Available || p.Id == WeaponId.Glock17 || (p.Def != null && p.Def.IsThrowable) || p.Id == WeaponId.GrappleHook) continue;
             float d = Vector3.Distance(p.transform.position, me.transform.position);
             if (d < bestD) { bestD = d; best = p; }
         }

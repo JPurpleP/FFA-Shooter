@@ -81,7 +81,7 @@ public class WeaponPickup : NetworkBehaviour
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         }
         model.transform.localPosition = -visual.InverseTransformPoint(bounds.center);
-        float scale = def.Id == WeaponId.FragGrenade ? 3.2f : def.Id == WeaponId.Glock17 || def.Id == WeaponId.GoldenDeagle || def.Id == WeaponId.GrappleHook ? 2f : 1.25f; // small things are hard to spot
+        float scale = def.IsThrowable ? (def.Id == WeaponId.Molotov ? 2.4f : 3.2f) : def.Id == WeaponId.Glock17 || def.Id == WeaponId.GoldenDeagle || def.Id == WeaponId.GrappleHook ? 2f : 1.25f; // small things are hard to spot
         visual.localScale = Vector3.one * scale;
 
         glow = new GameObject("Glow").AddComponent<Light>();

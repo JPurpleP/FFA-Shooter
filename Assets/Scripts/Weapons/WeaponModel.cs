@@ -38,6 +38,9 @@ public class WeaponModel : MonoBehaviour
             case WeaponId.M32: BuildM32(m, b); break;
             case WeaponId.RPG7: BuildRPG(m, b); break;
             case WeaponId.FragGrenade: BuildFrag(m, b); break;
+            case WeaponId.SmokeGrenade: BuildSmoke(m, b); break;
+            case WeaponId.RopeGrenade: BuildRopeGrenade(m, b); break;
+            case WeaponId.Molotov: BuildMolotov(m, b); break;
             case WeaponId.AA12: BuildAA12(m, b); break;
             case WeaponId.Mosin: BuildMosin(m, b); break;
             case WeaponId.PPSh41: BuildPPSh(m, b); break;
@@ -1025,6 +1028,48 @@ public class WeaponModel : MonoBehaviour
         b.Box(null, "Spoon", new Vector3(0.012f, 0.02f, 0f), new Vector3(0.006f, 0.05f, 0.014f), a.gunMetal, new Vector3(0f, 0f, -12f));
         b.Cyl(null, "PinRing", new Vector3(-0.016f, 0.05f, 0f), 0.012f, 0.002f, a.gunMetal, Builder.Axis.Z);
         m.muzzle = b.Group("Muzzle", Vector3.zero);
+    }
+
+    static void BuildSmoke(WeaponModel m, Builder b)
+    {
+        var a = GameAssets.I;
+        var can = b.Cyl(null, "Canister", Vector3.zero, 0.03f, 0.11f, a.olive, Builder.Axis.Y);
+        Builder.Tint(can, new Color(0.55f, 0.58f, 0.6f));
+        var band = b.Cyl(null, "Band", new Vector3(0f, 0.035f, 0f), 0.031f, 0.014f, a.sightWhite, Builder.Axis.Y);
+        Builder.Tint(band, new Color(0.3f, 0.75f, 0.35f));
+        b.Cyl(null, "Fuze", new Vector3(0f, 0.065f, 0f), 0.011f, 0.022f, a.gunMetal, Builder.Axis.Y);
+        b.Box(null, "Spoon", new Vector3(0.016f, 0.04f, 0f), new Vector3(0.006f, 0.06f, 0.014f), a.gunMetal, new Vector3(0f, 0f, -8f));
+        b.Cyl(null, "PinRing", new Vector3(-0.016f, 0.078f, 0f), 0.012f, 0.002f, a.gunMetal, Builder.Axis.Z);
+        m.muzzle = b.Group("Muzzle", Vector3.zero);
+    }
+
+    static void BuildRopeGrenade(WeaponModel m, Builder b)
+    {
+        var a = GameAssets.I;
+        var body = b.Cyl(null, "Body", Vector3.zero, 0.032f, 0.09f, a.gunMetal, Builder.Axis.Y);
+        Builder.Tint(body, new Color(0.25f, 0.22f, 0.2f));
+        // Coils of rope wound around it.
+        for (int i = 0; i < 5; i++)
+        {
+            var coil = b.Cyl(null, "Coil", new Vector3(0f, -0.032f + i * 0.016f, 0f), 0.037f, 0.011f, a.gunWood, Builder.Axis.Y);
+            Builder.Tint(coil, new Color(0.78f, 0.62f, 0.38f));
+        }
+        b.Cyl(null, "Fuze", new Vector3(0f, 0.055f, 0f), 0.011f, 0.022f, a.gunMetal, Builder.Axis.Y);
+        b.Cyl(null, "PinRing", new Vector3(-0.016f, 0.068f, 0f), 0.012f, 0.002f, a.gunMetal, Builder.Axis.Z);
+        m.muzzle = b.Group("Muzzle", Vector3.zero);
+    }
+
+    static void BuildMolotov(WeaponModel m, Builder b)
+    {
+        var a = GameAssets.I;
+        var glass = new Color(0.25f, 0.45f, 0.2f);
+        Builder.Tint(b.Cyl(null, "Bottle", Vector3.zero, 0.036f, 0.13f, a.gunPolymer, Builder.Axis.Y), glass);
+        Builder.Tint(b.Sphere(null, "Shoulder", new Vector3(0f, 0.065f, 0f), 0.036f, a.gunPolymer), glass);
+        Builder.Tint(b.Cyl(null, "Neck", new Vector3(0f, 0.11f, 0f), 0.013f, 0.06f, a.gunPolymer, Builder.Axis.Y), glass);
+        // Petrol inside, and a rag stuffed in the neck.
+        Builder.Tint(b.Cyl(null, "Petrol", new Vector3(0f, -0.02f, 0f), 0.033f, 0.08f, a.sightWhite, Builder.Axis.Y), new Color(0.8f, 0.6f, 0.2f));
+        Builder.Tint(b.Box(null, "Rag", new Vector3(0f, 0.15f, 0f), new Vector3(0.02f, 0.05f, 0.02f), a.sightWhite, new Vector3(0f, 0f, 12f)), new Color(0.85f, 0.8f, 0.68f));
+        m.muzzle = b.Group("Muzzle", new Vector3(0f, 0.17f, 0f));
     }
 
     // ------------------------------------------------------------------ primitive helpers

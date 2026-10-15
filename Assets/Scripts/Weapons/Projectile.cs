@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
-public enum ProjectileKind : byte { None, Grenade40, Rocket, Frag }
+public enum ProjectileKind : byte { None, Grenade40, Rocket, Frag, Smoke, Rope, Molotov }
 
 /// <summary>
 /// Explosive projectile: 40mm grenade, RPG rocket or thrown frag grenade. The server simulates it and decides the
@@ -20,6 +20,8 @@ public class Projectile : NetworkBehaviour
 
     public WeaponDef Def => WeaponDefs.Get(Weapon.Value);
     ProjectileKind Kind => Def != null ? Def.Projectile : ProjectileKind.None;
+    /// <summary>Thrown by hand: a physical object that bounces around (molotovs shatter on the first hit instead).</summary>
+    bool Thrown => Kind is ProjectileKind.Frag or ProjectileKind.Smoke or ProjectileKind.Rope or ProjectileKind.Molotov;
 
     // Server-side launch state
     WeaponId initWeapon;
@@ -58,12 +60,13 @@ public class Projectile : NetworkBehaviour
             lastPos = initPos;
         }
         BuildVisual();
-        if (IsServer && Kind == ProjectileKind.Frag)
+        if (IsServer && Thrown)
         {
             // Physical, bouncing grenade (on the Debris layer: it rattles off the world but passes through players).
             var col = gameObject.AddComponent<SphereCollider>();
             col.radius = 0.06f;
-            col.material = new PhysicsMaterial("Frag") { bounciness = 0.35f, dynamicFriction = 0.6f, staticFriction = 0.6f, bounceCombine = PhysicsMaterialCombine.Maximum };
+            col.radius = Kind == ProjectileKind.Molotov ? 0.05f : 0.06f;
+            col.material = new PhysicsMaterial("Frag") { bounciness = Kind == ProjectileKind.Molotov ? 0f : 0.35f, dynamicFriction = 0.6f, staticFriction = 0.6f, bounceCombine = PhysicsMaterialCombine.Maximum };
             gameObject.layer = GameAssets.DebrisLayer;
             fragBody = gameObject.AddComponent<Rigidbody>();
             fragBody.mass = 0.4f;
@@ -88,7 +91,27 @@ public class Projectile : NetworkBehaviour
         switch (def.Projectile)
         {
             case ProjectileKind.Frag:
-                WeaponModel.Build(WeaponId.FragGrenade, visual);
+            case ProjectileKind.Smoke:
+            case ProjectileKind.Rope:
+                WeaponModel.Build(def.Id, visual);
+                break;
+            case ProjectileKind.Molotov:
+                WeaponModel.Build(def.Id, visual);
+                // Burning rag.
+                var rag = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                DestroyImmediate(rag.GetComponent<Collider>());
+                rag.transform.SetParent(visual, false);
+                rag.transform.localPosition = new Vector3(0f, 0.17f, 0f);
+                rag.transform.localScale = Vector3.one * 0.22f;
+                rag.GetComponent<Renderer>().sharedMaterial = a.flashGlow;
+                rag.AddComponent<FaceCamera>();
+                var ragLight = new GameObject("RagLight").AddComponent<Light>();
+                ragLight.transform.SetParent(visual, false);
+                ragLight.transform.localPosition = new Vector3(0f, 0.2f, 0f);
+                ragLight.type = LightType.Point;
+                ragLight.color = new Color(1f, 0.55f, 0.2f);
+                ragLight.range = 4f;
+                ragLight.intensity = 1.6f;
                 break;
             case ProjectileKind.Grenade40:
                 b.Cyl(null, "Shell", Vector3.zero, 0.02f, 0.07f, a.olive, WeaponModel.Builder.Axis.Z);
@@ -172,7 +195,7 @@ public class Projectile : NetworkBehaviour
     void Update()
     {
         if (!IsSpawned || exploded || Def == null) return;
-        if (Kind == ProjectileKind.Frag)
+        if (Thrown)
         {
             if (IsServer)
             {
@@ -225,15 +248,78 @@ public class Projectile : NetworkBehaviour
 
     // ------------------------------------------------------------------ the blast (server decides, everyone sees)
 
+    /// <summary>Server: a molotov shatters on the first thing it hits.</summary>
+    void OnCollisionEnter(Collision c)
+    {
+        if (!IsServer || exploded || Kind != ProjectileKind.Molotov) return;
+        Explode(c.contactCount > 0 ? c.GetContact(0).point + c.GetContact(0).normal * 0.05f : transform.position);
+    }
+
     void Explode(Vector3 at)
     {
         if (!IsServer || exploded) return;
         exploded = true;
         if (fragBody != null) fragBody.isKinematic = true;
         var def = Def;
-        ApplyBlast(at, def, shooter);
-        ExplodeRpc(at);
+        switch (Kind)
+        {
+            case ProjectileKind.Smoke:
+                SmokeRpc(at);
+                break;
+            case ProjectileKind.Rope:
+                ServerSnareAround(at);
+                RopeRpc(at);
+                break;
+            case ProjectileKind.Molotov:
+                // The fire pools on the ground under where the bottle broke.
+                Vector3 ground = Physics.Raycast(at + Vector3.up * 0.3f, Vector3.down, out var g, 4f, 1, QueryTriggerInteraction.Ignore) ? g.point : at;
+                FireRpc(ground);
+                break;
+            default:
+                ApplyBlast(at, def, shooter);
+                ExplodeRpc(at);
+                break;
+        }
         StartCoroutine(DespawnSoon());
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void SmokeRpc(Vector3 at)
+    {
+        exploded = true;
+        if (visual != null) visual.gameObject.SetActive(false);
+        SmokeCloud.Create(at);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void RopeRpc(Vector3 at)
+    {
+        exploded = true;
+        if (visual != null) visual.gameObject.SetActive(false);
+        Gore.PlayAt(Sfx.GrappleFire, at, 1f);
+        Gore.PlayAt(Sfx.Swing, at, 1f);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void FireRpc(Vector3 ground)
+    {
+        exploded = true;
+        if (visual != null) visual.gameObject.SetActive(false);
+        FireArea.Create(ground, IsServer ? shooter : null, IsServer);
+    }
+
+    /// <summary>Server: rope grenade. Everyone within reach and in sight of it is tied in place.</summary>
+    void ServerSnareAround(Vector3 at)
+    {
+        Vector3 from = at + Vector3.up * 0.3f;
+        foreach (var p in new List<FpsPlayer>(FpsPlayer.All))
+        {
+            if (!p.IsSpawned || p.IsDead || p.InLobby.Value || p.InDuel || p == shooter || p.SpawnProtected) continue;
+            Vector3 chest = p.ChestPoint;
+            if (Vector3.Distance(from, chest) > WeaponDefs.RopeRadius) continue;
+            if (Physics.Linecast(from, chest, 1, QueryTriggerInteraction.Ignore)) continue; // behind cover
+            p.ServerSnare(at, WeaponDefs.SnareSeconds);
+        }
     }
 
     IEnumerator DespawnSoon()

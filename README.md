@@ -32,7 +32,7 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   walking your last steps, before you respawn.
 - First to 25 kills wins; after 8 seconds everyone goes back to the lobby to ready up for the next match. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
 - Controls: WASD · Shift sprint · Space jump · LMB fire · RMB aim (scope on the Barrett) · **Q/E lean** · R reload ·
-  F pick up / swap · 1/2 or mouse wheel to switch · Tab scores · Esc menu (resume, sensitivity / FOV / volume, join code, leave)
+  F pick up / swap · 1/2/3 or mouse wheel to switch (3 = throwables; press 3 again for the next type) · LMB with slot 3 out or **hold T** from any slot, release to throw · Tab scores · Esc menu (resume, sensitivity / FOV / volume, join code, leave)
 - Leaning moves your head (and its hitbox) out from cover; it stops short of walls.
 - **Ctrl**: tap (or press while standing still / walking) to crouch or stand. **Hold Ctrl while sprinting to slide** —
   a burst of speed that decays; keep holding to end in a crouch, Space to slide-jump. **Hold Ctrl in the air** and you
@@ -65,7 +65,10 @@ aim / hunting you through walls / speed; bots don't fly).
 | Barrett M82A1 | 10 (+30) | scoped, one-shot body |
 | M32 MGL | 6 (+6) | 40mm grenades in an arc, red dot |
 | RPG-7 | 1 (+3) | fast rocket, big blast, backblast |
-| Frag grenades | start with 2, max 4 | **hold T** to cook (3.2 s fuse), release to throw; bounce |
+| Frag grenade | start with 2, max 4 | slot 3; cook while held (3.2 s fuse), release to throw; bounces |
+| Smoke grenade | max 2 | slot 3; a thick cloud for ~16 s that also blinds bots and the aimbot |
+| Rope grenade | max 2 | slot 3; after 1.3 s it snares everyone in sight within 15 m: roped in place for 10 s (can still aim and shoot) |
+| Molotov | max 2 | slot 3; shatters on impact into a 3.6 m pool of fire for 8 s (24 damage/s, credited to the thrower) |
 | M1911 | 7 (+21) | .45 ACP, tall sights |
 | Glock (switch) | 33 (+66) | full-auto, held sideways one-handed (sights still line up) |
 | Cattleman | 6 (+24) | single-action .45 Colt revolver, loads one round at a time |
@@ -91,7 +94,8 @@ club, at full health, fists only (LMB punches, hold to keep swinging; head punch
 health, with all their guns; the loser dies, their guns drop on the map where they were, and they respawn as usual. Up to
 four duels can run at once. Bots fight duels too (and go for the golden gun).
 
-Two weapon slots. Picking up a gun you already carry takes its ammo; with both slots full you swap your current gun.
+Two weapon slots plus slot 3 for throwables. Picking up a gun you already carry takes its ammo; with both slots full you swap your current gun.
+**Grenades spawn on their own spots** (10 per map, a random throwable each time, back 40 s after being taken), separate from the gun spawns.
 Dead players drop everything they carry (despawns after 30 s, 60 s for the Barrett).
 
 ## Gore
@@ -123,7 +127,7 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   -ffagive <0-4>   start with a weapon    -ffaaim  hold aim-down-sights    -ffalean <-1..1>  hold a lean
   -ffagrapple <pitch>   look up by <pitch> degrees and fire the hook
   -ffagoretest     auto-cycling gore lab   -ffagorepart <0-5>  -ffagoreweapon <0-5>
-  -ffaat <x> <z> <yaw>   teleport   -ffadummy <dist> [-ffadummyyaw <deg>] [-ffadummypose 0-3]   -ffastance 1|2|3|4|5 (crouch, prone, slide, air slide, fly up)   -ffadev  enable the F1 panel   -ffaduel  start a golden duel with the first bot
+  -ffaat <x> <z> <yaw>   teleport   -ffadummy <dist> [-ffadummyyaw <deg>] [-ffadummypose 0-3]   -ffastance 1|2|3|4|5 (crouch, prone, slide, air slide, fly up)   -ffathrowtype 0-3  throw a frag / smoke / rope / molotov with -ffathrow   -ffagive 22-24  give smoke / rope / molotov   -ffadev  enable the F1 panel   -ffaduel  start a golden duel with the first bot
   -ffashots <prefix> <count> <interval>   screenshot series   -ffascreenshot <file>
   -ffamenutab <0-2>  -ffaskin <id>  -ffaskinline [first] [count]   -ffafire   hold the trigger   -ffathrow  cook and throw a grenade   -ffabotgive <id>  arm all bots        -ffatopdown [size] [x] [z]   orthographic map overview, UI hidden
   ```

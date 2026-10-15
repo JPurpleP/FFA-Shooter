@@ -29,7 +29,8 @@ public partial class GameUI : MonoBehaviour
     public static bool ForceAim { get; private set; } // -ffaaim: hold aim-down-sights (screenshot tests)
     public static float ForceLean { get; private set; } // -ffalean <-1..1>: hold a lean (screenshot tests)
     public static bool ForceScores { get; private set; } // -ffascores: keep the leaderboard open (screenshot tests)
-    public static int TestStance { get; private set; } = -1; // -ffastance 1|2|3: crouch / prone / sprint-and-slide (tests)
+    public static int TestStance { get; private set; } = -1;
+    public static int TestThrowType { get; private set; } = -1; // -ffathrowtype 0-3: frag / smoke / rope / molotov (tests) // -ffastance 1|2|3: crouch / prone / sprint-and-slide (tests)
     static bool hideUi;
     public static bool ForceFire { get; private set; } // -ffafire: hold the trigger (effects screenshots)
     public static bool ForceThrow { get; private set; } // -ffathrow: cook and throw a grenade (tests)
@@ -171,6 +172,8 @@ public partial class GameUI : MonoBehaviour
             Shadowed(new Rect(sp.x / scale - 60, (Screen.height - sp.y) / scale - 10, 120, 20), "PROTECTED", tag, ProtectColor);
         }
     }
+
+    static string ThrowShort(int type) => type switch { 0 => "Frag", 1 => "Smoke", 2 => "Rope", _ => "Molotov" };
 
     static void DrawLine(Vector2 a, Vector2 b, float width, Color color)
     {
@@ -327,6 +330,7 @@ public partial class GameUI : MonoBehaviour
         if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 2); // screenshot tests
         if (int.TryParse(Arg("-ffaskin"), out int sk)) GameSettings.Skin = Mathf.Clamp(sk, 0, Skins.Count - 1);
         if (int.TryParse(Arg("-ffastance"), out int ts)) TestStance = ts;
+        if (int.TryParse(Arg("-ffathrowtype"), out int tt)) TestThrowType = Mathf.Clamp(tt, 0, 3);
         // -ffatopdown [size] [x] [z]: orthographic map overview with the UI hidden (map review screenshots)
         if (args.Contains("-ffatopdown") && menuCamera != null)
         {
@@ -759,6 +763,12 @@ public partial class GameUI : MonoBehaviour
             Shadowed(new Rect(0, 82, w, 24), sd > 0f ? $"<size=13>Sudden death in {Mathf.CeilToInt(sd)}s</size>" : "<size=15>SUDDEN DEATH</size>",
                 centerLabel, sd > 0f ? new Color(1f, 1f, 1f, 0.7f) : new Color(1f, 0.3f, 0.3f, 0.6f + 0.4f * Mathf.Sin(t * 8f)));
         }
+        else if (def != null && def.IsThrowable)
+        {
+            // Slot 3: how many of the selected throwable are left.
+            Shadowed(new Rect(w - 330, h - 75, 300, 50), $"{me.CurrentMag}", ammoStyle, Color.white);
+            Shadowed(new Rect(w - 530, h - 98, 500, 24), "<size=13>Hold LMB / T, release to throw  ·  3: next type</size>", right, new Color(1f, 1f, 1f, 0.7f));
+        }
         else if (def != null)
         {
             string ammo = me.IsReloading && !def.ReloadPerRound
@@ -776,12 +786,25 @@ public partial class GameUI : MonoBehaviour
             var sd = WeaponDefs.Get(inv.Weapon(slot));
             bool active = slot == inv.Active;
             string text = sd != null ? $"[{slot + 1}] {sd.Name}  <size=12>{sd.Caliber}</size>" : $"[{slot + 1}] —";
-            Shadowed(new Rect(w - 430, h - 150 + slot * 24, 400, 24), text, right,
+            Shadowed(new Rect(w - 530, h - 174 + slot * 24, 500, 24), text, right,
                 active ? Color.white : new Color(1f, 1f, 1f, 0.45f));
         }
 
-        // Grenades
-        Shadowed(new Rect(w - 430, h - 174, 400, 24), $"[T] Frags × {inv.Grenades}", right, inv.Grenades > 0 ? new Color(0.75f, 0.9f, 0.6f) : new Color(1f, 1f, 1f, 0.35f));
+        // Slot 3: throwables, the selected kind highlighted (3 again cycles, T throws from any slot).
+        var parts = new System.Collections.Generic.List<string>();
+        for (int tt = 0; tt < WeaponDefs.Throwables.Length; tt++)
+        {
+            int n = inv.ThrowCount(tt);
+            if (n <= 0) continue;
+            string nm = ThrowShort(tt);
+            parts.Add(tt == inv.Throwable ? $"<b>{nm} × {n}</b>" : $"<color=#ffffff88>{nm} × {n}</color>");
+        }
+        bool throwActive = inv.Active == Inventory.ThrowSlot;
+        string throwText = parts.Count > 0 ? $"[3] {string.Join("   ", parts)}  <size=12>[T] throw</size>" : "[3] —";
+        Shadowed(new Rect(w - 530, h - 126, 500, 24), throwText, right,
+            throwActive ? Color.white : parts.Count > 0 ? new Color(0.8f, 0.9f, 0.7f, 0.8f) : new Color(1f, 1f, 1f, 0.35f));
+        if (me.Snared)
+            Shadowed(new Rect(0, h / 2 + 90, w, 30), $"<b>SNARED</b>  {me.SnareSecondsLeft:0.0}s", new GUIStyle(centerLabel) { fontSize = 20 }, new Color(0.95f, 0.7f, 0.35f));
         if (me.IsCookingGrenade)
             Shadowed(new Rect(0, h / 2 + 30, w, 26), $"COOKING  {me.CookTimeLeft:0.0}", centerLabel, me.CookTimeLeft < 1f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.8f, 0.3f));
 
@@ -790,7 +813,12 @@ public partial class GameUI : MonoBehaviour
         if (pickup != null && pickup.Def != null && !me.IsDead && pickup.Id == WeaponId.GrappleHook)
             Shadowed(new Rect(0, h / 2 + 60, w, 26), me.HasGrapple.Value ? "You already have a grappling hook" : "[F] Pick up Grappling Hook  <size=13>(G to fire)</size>", centerLabel, pickup.Def.PickupGlow);
         else if (pickup != null && pickup.Def != null && !me.IsDead && pickup.Def.IsThrowable)
-            Shadowed(new Rect(0, h / 2 + 60, w, 26), inv.Grenades >= WeaponDefs.MaxGrenades ? "Grenades full" : $"[F] Pick up {pickup.Mag.Value} frag grenades", centerLabel, pickup.Def.PickupGlow);
+        {
+            int pt = WeaponDefs.ThrowableIndex(pickup.Id);
+            bool full = pt >= 0 && inv.ThrowCount(pt) >= WeaponDefs.MaxCarry[pt];
+            string what = pickup.Mag.Value > 1 ? $"{pickup.Mag.Value} × {pickup.Def.Name}" : pickup.Def.Name;
+            Shadowed(new Rect(0, h / 2 + 60, w, 26), full ? $"{pickup.Def.Name}: carrying the most you can" : $"[F] Pick up {what}", centerLabel, pickup.Def.PickupGlow);
+        }
         else if (pickup != null && pickup.Def != null && !me.IsDead)
         {
             var pd = pickup.Def;

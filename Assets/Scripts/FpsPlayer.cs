@@ -5,23 +5,45 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>Two weapon slots with ammo, written by the owning client.</summary>
+/// <summary>
+/// Two weapon slots with ammo plus slot 3, the throwables (a count per type and which type is selected).
+/// Written by the owning client.
+/// </summary>
 public struct Inventory : INetworkSerializeByMemcpy
 {
-    public int W0, W1, M0, M1, R0, R1, Active, Grenades;
+    public const int ThrowSlot = 2;
+    public int W0, W1, M0, M1, R0, R1, Active;
+    public int Frags, Smokes, Ropes, Molotovs, Throwable; // Throwable = selected type (index into WeaponDefs.Throwables)
 
     public static Inventory Default
     {
         get
         {
             var glock = WeaponDefs.Get(WeaponId.Glock17);
-            return new Inventory { W0 = (int)WeaponId.Glock17, W1 = -1, M0 = glock.MagSize, R0 = glock.MagSize, Active = 0, Grenades = 2 };
+            return new Inventory { W0 = (int)WeaponId.Glock17, W1 = -1, M0 = glock.MagSize, R0 = glock.MagSize, Active = 0, Frags = 2 };
         }
     }
 
-    public int Weapon(int slot) => slot == 0 ? W0 : W1;
-    public int Mag(int slot) => slot == 0 ? M0 : M1;
-    public int Reserve(int slot) => slot == 0 ? R0 : R1;
+    public int ThrowCount(int type) => type switch { 0 => Frags, 1 => Smokes, 2 => Ropes, 3 => Molotovs, _ => 0 };
+    public void SetThrowCount(int type, int n)
+    {
+        switch (type) { case 0: Frags = n; break; case 1: Smokes = n; break; case 2: Ropes = n; break; case 3: Molotovs = n; break; }
+    }
+    public int TotalThrowables => Frags + Smokes + Ropes + Molotovs;
+    /// <summary>The next throwable type you have any of, cycling on from `from` (or -1 if none).</summary>
+    public int NextThrowable(int from)
+    {
+        for (int i = 1; i <= 4; i++)
+        {
+            int t = (from + i) % 4;
+            if (ThrowCount(t) > 0) return t;
+        }
+        return -1;
+    }
+
+    public int Weapon(int slot) => slot == 0 ? W0 : slot == 1 ? W1 : ThrowCount(Throwable) > 0 ? (int)WeaponDefs.Throwables[Throwable] : -1;
+    public int Mag(int slot) => slot == 0 ? M0 : slot == 1 ? M1 : ThrowCount(Throwable);
+    public int Reserve(int slot) => slot == 0 ? R0 : slot == 1 ? R1 : 0;
     public void Set(int slot, int weapon, int mag, int reserve)
     {
         if (slot == 0) { W0 = weapon; M0 = mag; R0 = reserve; }
@@ -31,7 +53,8 @@ public struct Inventory : INetworkSerializeByMemcpy
     public void SetReserve(int slot, int r) { if (slot == 0) R0 = r; else R1 = r; }
     public int SlotOf(int weapon) => W0 == weapon ? 0 : W1 == weapon ? 1 : -1;
     public int EmptySlot => W0 < 0 ? 0 : W1 < 0 ? 1 : -1;
-    public bool Same(Inventory o) => W0 == o.W0 && W1 == o.W1 && M0 == o.M0 && M1 == o.M1 && R0 == o.R0 && R1 == o.R1 && Active == o.Active && Grenades == o.Grenades;
+    public bool Same(Inventory o) => W0 == o.W0 && W1 == o.W1 && M0 == o.M0 && M1 == o.M1 && R0 == o.R0 && R1 == o.R1 && Active == o.Active
+                                     && Frags == o.Frags && Smokes == o.Smokes && Ropes == o.Ropes && Molotovs == o.Molotovs && Throwable == o.Throwable;
 }
 
 public enum Stance : byte { Stand, Crouch, Prone, Slide }
@@ -47,7 +70,7 @@ public struct PlayerInput
     public bool Grapple; // fire / release the grappling hook
     public bool CrouchDown, CrouchHeld, ProneToggle; // Ctrl (slide / crouch), Z (prone)
     public bool GrenadeHeld; // T: hold to cook, release to throw
-    public int SwitchTo; // -1 none, 0/1 = slot, 2 = other slot
+    public int SwitchTo; // -1 none, 0/1/2 = slot (2 = throwables; again = next type), 3 = next slot, 4 = previous slot
 }
 
 /// <summary>
@@ -106,6 +129,11 @@ public class FpsPlayer : NetworkBehaviour
     // Spawn protection: can't be hurt for a few seconds after spawning, until you move or fire.
     public const float SpawnProtectSeconds = 3f;
     public readonly NetworkVariable<bool> Protected = new(); // server written; off when it runs out or is broken
+    // Rope grenade: tied in place (can still look and shoot) until this server time.
+    public readonly NetworkVariable<double> SnaredUntil = new();
+    public readonly NetworkVariable<Vector3> SnareAnchor = new();
+    public bool Snared => IsSpawned && !IsDead && ServerNow < SnaredUntil.Value;
+    public float SnareSecondsLeft => Snared ? (float)(SnaredUntil.Value - ServerNow) : 0f;
     public bool SpawnProtected => IsSpawned && !IsDead && Protected.Value;
     public float SpawnProtectLeft => SpawnProtected ? Mathf.Max(0f, SpawnProtectSeconds - (Time.time - protectStartedLocal)) : 0f;
     bool protectionDropSent;
@@ -363,6 +391,7 @@ public class FpsPlayer : NetworkBehaviour
         UpdatePoseWeights();
         UpdateWeaponVisual();
         UpdateRopeVisual();
+        UpdateSnareVisual();
     }
 
     void LateUpdate()
@@ -438,6 +467,15 @@ public class FpsPlayer : NetworkBehaviour
         // Move
         if (alive && controller.enabled)
         {
+            if (Snared)
+            {
+                // Roped in place: no moving, jumping, hooking or changing stance (looking and shooting still work).
+                input.Move = Vector2.zero;
+                input.Jump = input.JumpHeld = input.CrouchDown = input.CrouchHeld = input.ProneToggle = input.Grapple = false;
+                if (sliding) EndSlide(false);
+                if (grappling) ReleaseGrapple(false);
+                momentum = Vector3.zero;
+            }
             if (Flying)
             {
                 if (sliding) EndSlide(false);
@@ -526,7 +564,7 @@ public class FpsPlayer : NetworkBehaviour
         if (GameUI.ForceThrow)
         {
             throwTestTimer += Time.deltaTime;
-            input.GrenadeHeld = throwTestTimer > 1.2f && throwTestTimer < 2.0f; // cook ~0.8 s, then throw
+            input.GrenadeHeld = throwTestTimer > 2.5f && throwTestTimer < 3.3f; // after test gives land; cook ~0.8 s, then throw
         }
         if (GameUI.ForceFire)
         {
@@ -556,6 +594,7 @@ public class FpsPlayer : NetworkBehaviour
             if (kb.eKey.isPressed) input.Lean += 1f;
             if (kb.digit1Key.wasPressedThisFrame) input.SwitchTo = 0;
             if (kb.digit2Key.wasPressedThisFrame) input.SwitchTo = 1;
+            if (kb.digit3Key.wasPressedThisFrame) input.SwitchTo = 2;
         }
         if (mouse != null)
         {
@@ -564,7 +603,8 @@ public class FpsPlayer : NetworkBehaviour
             input.FirePressed |= mouse.leftButton.wasPressedThisFrame;
             input.Aim = mouse.rightButton.isPressed || GameUI.ForceAim;
             input.Grapple |= mouse.middleButton.wasPressedThisFrame;
-            if (Mathf.Abs(mouse.scroll.ReadValue().y) > 0.1f) input.SwitchTo = 2;
+            float wheel = mouse.scroll.ReadValue().y;
+            if (Mathf.Abs(wheel) > 0.1f) input.SwitchTo = wheel < 0f ? 3 : 4; // wheel down = next slot
         }
         return input;
     }
@@ -582,8 +622,22 @@ public class FpsPlayer : NetworkBehaviour
         }
         var def = CurrentDef;
 
-        // Switching
-        int target = input.SwitchTo == 2 ? 1 - inv.Active : input.SwitchTo;
+        // Switching: 1 / 2 / 3, or the wheel through every slot you have something in. 3 again = next grenade type.
+        int target = input.SwitchTo == 3 ? CycleSlot(1) : input.SwitchTo == 4 ? CycleSlot(-1) : input.SwitchTo;
+        if (alive && target == Inventory.ThrowSlot)
+        {
+            int nt = inv.Active == Inventory.ThrowSlot && input.SwitchTo == 2 ? inv.NextThrowable(inv.Throwable)
+                   : inv.ThrowCount(inv.Throwable) > 0 ? inv.Throwable : inv.NextThrowable(inv.Throwable);
+            if (nt >= 0 && nt != inv.Throwable)
+            {
+                inv.Throwable = nt;
+                if (inv.Active == Inventory.ThrowSlot)
+                {
+                    drawEndTime = Time.time + 0.25f;
+                    audioSource.PlayOneShot(Sfx.Reload, 0.4f);
+                }
+            }
+        }
         if (alive && target >= 0 && target != inv.Active && inv.Weapon(target) >= 0)
         {
             inv.Active = target;
@@ -594,9 +648,12 @@ public class FpsPlayer : NetworkBehaviour
             audioSource.PlayOneShot(Sfx.Reload, 0.4f);
             def = CurrentDef;
         }
-        if (def == null || !alive)
+        if (def == null || !alive || inv.Active == Inventory.ThrowSlot)
         {
+            // Nothing to shoot (slot 3 throws with the trigger in UpdateGrenade).
             adsT = Mathf.MoveTowards(adsT, 0f, Time.deltaTime * 8f);
+            reloading = false;
+            triggerWasDown = input.FireHeld;
             return;
         }
 
@@ -648,6 +705,17 @@ public class FpsPlayer : NetworkBehaviour
         }
         reloading = false;
         Fire(def, slot);
+    }
+
+    /// <summary>The next slot (dir +1) or previous one (-1) that has something in it, or -1.</summary>
+    int CycleSlot(int dir)
+    {
+        for (int k = 1; k <= 3; k++)
+        {
+            int s = ((inv.Active + dir * k) % 3 + 3) % 3;
+            if (s == Inventory.ThrowSlot ? inv.TotalThrowables > 0 : inv.Weapon(s) >= 0) return s;
+        }
+        return -1;
     }
 
     bool InfiniteAmmo => DevSettings.InfiniteAmmo && IsLocalHuman || (botOnServer && DevSettings.BotsInfiniteAmmo);
@@ -1199,6 +1267,7 @@ public class FpsPlayer : NetworkBehaviour
             respawnRoutine = null;
         }
         Health.Value = MaxHealth;
+        SnaredUntil.Value = 0;
         Protected.Value = true;
         protectEndsAt = Time.time + SpawnProtectSeconds;
         protectStartedLocal = Time.time;
@@ -1222,6 +1291,11 @@ public class FpsPlayer : NetworkBehaviour
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, newYaw, 0f));
         TeleportRpc(position, newYaw);
         if (keep.W1 >= 0) ServerGiveWeapon((WeaponId)keep.W1);
+        for (int t = 0; t < WeaponDefs.Throwables.Length; t++) // and the grenades (the teleport resets to the spawn loadout)
+        {
+            int extra = keep.ThrowCount(t) - Inventory.Default.ThrowCount(t);
+            if (extra > 0) GiveGrenadesRpc(t, extra);
+        }
     }
 
     [Rpc(SendTo.Owner)]
@@ -1287,10 +1361,11 @@ public class FpsPlayer : NetworkBehaviour
             pickup.Despawn();
             return;
         }
-        if (weapon == (int)WeaponId.FragGrenade)
+        int throwType = WeaponDefs.ThrowableIndex((WeaponId)weapon);
+        if (throwType >= 0)
         {
-            if (cur.Grenades >= WeaponDefs.MaxGrenades) return;
-            GiveGrenadesRpc(mag);
+            if (cur.ThrowCount(throwType) >= WeaponDefs.MaxCarry[throwType]) return;
+            GiveGrenadesRpc(throwType, mag);
             pickup.Despawn();
             return;
         }
@@ -1317,7 +1392,7 @@ public class FpsPlayer : NetworkBehaviour
         if (id == WeaponId.GrappleHook) { HasGrapple.Value = true; return; }
         var def = WeaponDefs.Get(id);
         var cur = Inv;
-        if (def.IsThrowable) { GiveGrenadesRpc(def.MagSize); return; }
+        if (def.IsThrowable) { GiveGrenadesRpc(WeaponDefs.ThrowableIndex(id), def.MagSize); return; }
         int have = cur.SlotOf((int)id);
         if (have >= 0) { GiveAmmoRpc(have, def.SpareAmmo + def.MagSize); return; }
         int slot = cur.EmptySlot >= 0 ? cur.EmptySlot : cur.Active;
@@ -1336,9 +1411,11 @@ public class FpsPlayer : NetworkBehaviour
     }
 
     [Rpc(SendTo.Owner)]
-    void GiveGrenadesRpc(int amount)
+    void GiveGrenadesRpc(int type, int amount)
     {
-        inv.Grenades = Mathf.Min(WeaponDefs.MaxGrenades, inv.Grenades + amount);
+        if (type < 0 || type >= WeaponDefs.Throwables.Length) return;
+        inv.SetThrowCount(type, Mathf.Min(WeaponDefs.MaxCarry[type], inv.ThrowCount(type) + amount));
+        if (inv.ThrowCount(inv.Throwable) == 0) inv.Throwable = type; // nothing selected yet: select what you picked up
         audioSource.PlayOneShot(Sfx.Pickup, 0.6f);
     }
 
@@ -1404,6 +1481,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         if (!IsEnemyOf(p)) return false;
         Vector3 to = p.AimPoint - head.position;
+        if (SmokeCloud.Blocks(head.position, p.AimPoint)) return false;
         return Physics.Raycast(head.position, to, out var hit, to.magnitude + 0.5f, GameAssets.ShotMask, QueryTriggerInteraction.Ignore)
                && hit.collider.GetComponentInParent<FpsPlayer>() == p;
     }
@@ -1608,38 +1686,63 @@ public class FpsPlayer : NetworkBehaviour
 
     // ------------------------------------------------------------------ explosives
 
-    /// <summary>Owner: hold T to pull the pin and cook, release to throw. Held too long, it goes off in your hand.</summary>
+    /// <summary>
+    /// Owner: throw the selected throwable. Hold T (from any slot) or the trigger with slot 3 out; release to throw.
+    /// Frags cook while held and go off in your hand if held too long; the others start their fuse on release.
+    /// </summary>
     void UpdateGrenade(PlayerInput input, bool alive)
     {
         if (!alive || InDuel) { cooking = false; return; }
-        if (input.GrenadeHeld && !cooking && inv.Grenades > 0 && Time.time >= nextGrenadeTime && !sliding)
+        if (GameUI.TestThrowType >= 0 && inv.ThrowCount(GameUI.TestThrowType) > 0) inv.Throwable = GameUI.TestThrowType; // tests
+        if (inv.ThrowCount(inv.Throwable) <= 0)
+        {
+            int nt = inv.NextThrowable(inv.Throwable);
+            if (nt >= 0) inv.Throwable = nt;
+        }
+        bool slotOut = inv.Active == Inventory.ThrowSlot && Time.time >= drawEndTime;
+        bool held = input.GrenadeHeld || (slotOut && input.FireHeld);
+        if (held && !cooking && inv.ThrowCount(inv.Throwable) > 0 && Time.time >= nextGrenadeTime && !sliding)
         {
             cooking = true;
+            cookType = inv.Throwable;
             cookStart = Time.time;
-            audioSource.PlayOneShot(Sfx.DryFire, 0.8f); // pin
+            audioSource.PlayOneShot(Sfx.DryFire, 0.8f); // pin / lighter
         }
         if (!cooking) return;
-        float held = Time.time - cookStart;
-        if (!input.GrenadeHeld || held >= WeaponDefs.FragFuse)
+        float heldFor = Time.time - cookStart;
+        bool frag = cookType == 0;
+        if (!held || (frag && heldFor >= WeaponDefs.FragFuse))
         {
             cooking = false;
-            inv.Grenades--;
+            inv.SetThrowCount(cookType, Mathf.Max(0, inv.ThrowCount(cookType) - 1));
             nextGrenadeTime = Time.time + 0.8f;
             drawEndTime = Time.time + 0.45f; // weapon dips while throwing
-            float fuse = Mathf.Max(0f, WeaponDefs.FragFuse - held);
-            Vector3 origin = fuse <= 0f ? head.position : head.position + head.forward * 0.45f + head.right * 0.15f;
-            Vector3 vel = fuse <= 0f ? Vector3.zero : head.forward * 14f + Vector3.up * 3.5f + Velocity * 0.5f;
-            ThrowGrenadeRpc(origin, vel, fuse);
+            float fuse = frag ? Mathf.Max(0f, WeaponDefs.FragFuse - heldFor)
+                : cookType == 1 ? WeaponDefs.SmokeFuse : cookType == 2 ? WeaponDefs.RopeFuse : WeaponDefs.MolotovMaxFlight;
+            bool inHand = frag && fuse <= 0f;
+            Vector3 origin = inHand ? head.position : head.position + head.forward * 0.45f + head.right * 0.15f;
+            Vector3 vel = inHand ? Vector3.zero : head.forward * 14f + Vector3.up * 3.5f + Velocity * 0.5f;
+            ThrowGrenadeRpc(origin, vel, fuse, cookType);
             audioSource.PlayOneShot(Sfx.Reload, 0.5f);
+            if (inv.ThrowCount(cookType) == 0)
+            {
+                // Out of that kind: pick another, or put the guns back up.
+                int nt = inv.NextThrowable(cookType);
+                if (nt >= 0) inv.Throwable = nt;
+                else if (inv.Active == Inventory.ThrowSlot) inv.Active = inv.W1 >= 0 ? 1 : 0;
+            }
         }
     }
 
     [Rpc(SendTo.Server)]
-    void ThrowGrenadeRpc(Vector3 origin, Vector3 velocity, float fuse)
+    void ThrowGrenadeRpc(Vector3 origin, Vector3 velocity, float fuse, int type)
     {
         if (IsDead || InDuel) return;
         if ((origin - head.position).sqrMagnitude > 4f) origin = head.position;
-        Projectile.Launch(WeaponId.FragGrenade, origin, Vector3.ClampMagnitude(velocity, 30f), Mathf.Clamp(fuse, 0f, WeaponDefs.FragFuse), this);
+        Protected.Value = false; // throwing ends spawn protection
+        var id = WeaponDefs.Throwables[Mathf.Clamp(type, 0, WeaponDefs.Throwables.Length - 1)];
+        float maxFuse = id == WeaponId.FragGrenade ? WeaponDefs.FragFuse : WeaponDefs.MolotovMaxFlight;
+        Projectile.Launch(id, origin, Vector3.ClampMagnitude(velocity, 30f), Mathf.Clamp(fuse, 0f, maxFuse), this);
     }
 
     [Rpc(SendTo.Server)]
@@ -1927,8 +2030,9 @@ public class FpsPlayer : NetworkBehaviour
 
     // Grenades and camera shake
     bool cooking;
+    int cookType;
     float cookStart, nextGrenadeTime;
-    public bool IsCookingGrenade => cooking;
+    public bool IsCookingGrenade => cooking && cookType == 0; // only frags have a cook timer
     public float CookTimeLeft => cooking ? Mathf.Max(0f, WeaponDefs.FragFuse - (Time.time - cookStart)) : 0f;
     static float shake;
     public Vector3 ChestPoint => transform.position + Vector3.up * controller.height * 0.62f;
@@ -2109,6 +2213,86 @@ public class FpsPlayer : NetworkBehaviour
     {
         ApplyAliveState();
         if (IsLocalHuman && current < previous) GameUI.FlashDamage(previous - current);
+    }
+
+    // ------------------------------------------------------------------ rope snare
+
+    /// <summary>Server: a rope grenade went off at `anchor` and caught this player.</summary>
+    public void ServerSnare(Vector3 anchor, float seconds)
+    {
+        SnareAnchor.Value = anchor;
+        SnaredUntil.Value = ServerNow + seconds;
+        SnaredRpc();
+    }
+
+    [Rpc(SendTo.Owner)]
+    void SnaredRpc()
+    {
+        momentum = Vector3.zero;
+        if (IsLocalHuman) GameUI.ShowBanner("SNARED!", "Roped in place for 10 s. You can still aim and shoot.", new Color(0.95f, 0.7f, 0.35f));
+    }
+
+    static Material ropeMaterial;
+    LineRenderer[] snareLines;
+
+    /// <summary>Every client: ropes from the grenade to the snared player, and loops binding their waist and knees.</summary>
+    void UpdateSnareVisual()
+    {
+        bool on = Snared && body != null;
+        if (!on)
+        {
+            if (snareLines != null) foreach (var l in snareLines) l.enabled = false;
+            return;
+        }
+        if (snareLines == null)
+        {
+            if (ropeMaterial == null) ropeMaterial = new Material(Shader.Find("Sprites/Default")) { color = new Color(0.78f, 0.62f, 0.38f) };
+            snareLines = new LineRenderer[5];
+            for (int i = 0; i < snareLines.Length; i++)
+            {
+                var l = new GameObject("SnareRope").AddComponent<LineRenderer>();
+                l.transform.SetParent(transform, false);
+                l.sharedMaterial = ropeMaterial;
+                l.widthMultiplier = i < 3 ? 0.035f : 0.045f;
+                l.numCapVertices = 2;
+                l.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                l.useWorldSpace = true;
+                snareLines[i] = l;
+            }
+        }
+        Vector3 anchor = SnareAnchor.Value, root = transform.position;
+        float h = controller != null ? controller.height : 1.8f;
+        // Three sagging ropes from the grenade to the waist.
+        for (int i = 0; i < 3; i++)
+        {
+            var l = snareLines[i];
+            l.enabled = true;
+            Vector3 side = transform.right * ((i - 1) * 0.18f);
+            Vector3 end = root + Vector3.up * h * (0.45f + i * 0.06f) + side;
+            const int n = 10;
+            l.positionCount = n;
+            for (int k = 0; k < n; k++)
+            {
+                float t = k / (n - 1f);
+                Vector3 p = Vector3.Lerp(anchor + Vector3.up * 0.1f, end, t);
+                p.y -= Mathf.Sin(t * Mathf.PI) * 0.35f; // sag
+                l.SetPosition(k, p);
+            }
+        }
+        // Loops around the waist and the knees.
+        for (int i = 3; i < 5; i++)
+        {
+            var l = snareLines[i];
+            l.enabled = true;
+            float y = h * (i == 3 ? 0.52f : 0.25f);
+            const int n = 14;
+            l.positionCount = n;
+            for (int k = 0; k < n; k++)
+            {
+                float a = k / (n - 1f) * Mathf.PI * 2f;
+                l.SetPosition(k, root + new Vector3(Mathf.Cos(a) * 0.27f, y + Mathf.Sin(a * 3f) * 0.02f, Mathf.Sin(a) * 0.22f));
+            }
+        }
     }
 
     // ------------------------------------------------------------------ lobby

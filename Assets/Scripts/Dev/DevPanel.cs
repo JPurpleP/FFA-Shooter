@@ -48,7 +48,10 @@ public class DevPanel : MonoBehaviour
         if (int.TryParse(Arg("-ffastreak"), out int streak) && IsHost) // pretend you just got N kills in a row
             for (int i = 0; i < streak; i++) FpsPlayer.Local.ServerAddStreak();
         if (int.TryParse(Arg("-ffagive"), out int give) && IsHost)
-            FpsPlayer.Local.ServerGiveWeapon((WeaponId)Mathf.Clamp(give, 0, WeaponDefs.Count - 1));
+        {
+            var id = (WeaponId)Mathf.Clamp(give, 0, WeaponDefs.All.Length - 1);
+            if (id != WeaponId.Fists) FpsPlayer.Local.ServerGiveWeapon(id); // includes throwables (22 smoke, 23 rope, 24 molotov)
+        }
         if (int.TryParse(Arg("-ffabots"), out int bots) && IsHost)
         {
             var mode = Enum.TryParse<BotMode>(Arg("-ffabots", 2) ?? "", true, out var m) ? m : BotMode.Fighter;

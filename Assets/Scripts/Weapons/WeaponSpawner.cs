@@ -19,12 +19,14 @@ public class WeaponSpawner : MonoBehaviour
     {
         WeaponId.GoldenDeagle, WeaponId.GoldenDeagle,
         WeaponId.MP5, WeaponId.M4A1, WeaponId.Remington870, WeaponId.BarrettM82, WeaponId.M32, WeaponId.RPG7,
-        WeaponId.FragGrenade, WeaponId.AA12, WeaponId.Mosin, WeaponId.PPSh41, WeaponId.M249,
+        WeaponId.AA12, WeaponId.Mosin, WeaponId.PPSh41, WeaponId.M249,
         WeaponId.Cattleman, WeaponId.Magnum44, WeaponId.LeverAction, WeaponId.M1911, WeaponId.GlockSwitch,
         WeaponId.KrissVector, WeaponId.MP18,
     };
 
     public bool randomWeapon = true;
+    /// <summary>Grenade spawner: rolls one of the throwables (frag, smoke, rope, molotov) at equal odds.</summary>
+    public bool randomThrowable;
     public WeaponId weapon = WeaponId.M4A1;
     public float respawnDelay = 60f;
     public bool exclusive;
@@ -73,7 +75,8 @@ public class WeaponSpawner : MonoBehaviour
     public void SpawnNow()
     {
         if (current != null && current.IsSpawned) return;
-        var id = randomWeapon ? RandomPool[Random.Range(0, RandomPool.Length)] : weapon;
+        var id = randomThrowable ? WeaponDefs.Throwables[Random.Range(0, WeaponDefs.Throwables.Length)]
+            : randomWeapon ? RandomPool[Random.Range(0, RandomPool.Length)] : weapon;
         var def = WeaponDefs.Get(id);
         current = WeaponPickup.Spawn(id, def.MagSize, def.SpareAmmo, transform.position, this, -1f);
         nextSpawn = -1f;

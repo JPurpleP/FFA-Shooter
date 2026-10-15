@@ -991,6 +991,7 @@ public static partial class ProjectBuilder
         BuildNuketown();
         PlaceWeaponSpawners("Fluketown", 34);
         PlaceHookSpawners("Fluketown", 6);
+        PlaceGrenadeSpawners("Fluketown", 10);
         var fluketown = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, -2.5f), new Vector3(90f, 30f, 70f));
         ValidateDoorways("Fluketown");
@@ -1000,6 +1001,7 @@ public static partial class ProjectBuilder
         BuildCampground();
         PlaceWeaponSpawners("Timberline", 32, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         PlaceHookSpawners("Timberline", 6, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
+        PlaceGrenadeSpawners("Timberline", 10, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         var camp = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, 12f), new Vector3(100f, 30f, 90f));
         ValidateDoorways("Timberline");
@@ -1009,6 +1011,7 @@ public static partial class ProjectBuilder
         BuildCity();
         PlaceWeaponSpawners("Downtown", 34);
         PlaceHookSpawners("Downtown", 6);
+        PlaceGrenadeSpawners("Downtown", 10);
         var city = world.gameObject;
         AddProbe(world, new Vector3(0f, 8f, 10f), new Vector3(140f, 40f, 115f));
         ValidateDoorways("Downtown");

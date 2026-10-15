@@ -18,6 +18,10 @@ public static partial class ProjectBuilder
     static void PlaceHookSpawners(string map, int count, System.Func<Vector3, bool> reject = null)
         => PlaceSpawners(map, count, reject, WeaponId.GrappleHook, "Grapple Hook Spawns", 45f);
 
+    /// <summary>Grenade pickups (a random throwable each time) on their own spots, between the weapon and hook spawns.</summary>
+    static void PlaceGrenadeSpawners(string map, int count, System.Func<Vector3, bool> reject = null)
+        => PlaceSpawners(map, count, reject, WeaponId.FragGrenade, "Grenade Spawns", 40f);
+
     static void PlaceSpawners(string map, int count, System.Func<Vector3, bool> reject, WeaponId fixedItem, string groupName, float delay)
     {
         Physics.SyncTransforms();
@@ -79,11 +83,13 @@ public static partial class ProjectBuilder
         parent.SetParent(world, false);
         foreach (var p in chosen)
         {
-            var go = new GameObject(fixedItem == WeaponId.None ? "Random Weapon Spawner" : $"{fixedItem} Spawner");
+            bool grenades = fixedItem == WeaponId.FragGrenade;
+            var go = new GameObject(fixedItem == WeaponId.None ? "Random Weapon Spawner" : grenades ? "Random Grenade Spawner" : $"{fixedItem} Spawner");
             go.transform.SetParent(parent, false);
             go.transform.position = p + Vector3.up * 0.03f;
             var s = go.AddComponent<WeaponSpawner>();
             s.randomWeapon = fixedItem == WeaponId.None;
+            s.randomThrowable = grenades;
             s.weapon = fixedItem == WeaponId.None ? WeaponId.M4A1 : fixedItem;
             s.respawnDelay = delay;
         }

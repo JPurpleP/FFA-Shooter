@@ -11,7 +11,7 @@ public enum WeaponId
     GoldenDeagle = 5,
     M32 = 6,
     RPG7 = 7,
-    FragGrenade = 8, // pickup / throwable, never held in a weapon slot
+    FragGrenade = 8, // throwable (slot 3)
     AA12 = 9,
     Mosin = 10,
     PPSh41 = 11,
@@ -24,7 +24,10 @@ public enum WeaponId
     KrissVector = 18,
     MP18 = 19,        // single-shot break-action rifle
     Fists = 20,
-    GrappleHook = 21, // pickup only: gives the grappling hook (kept until you die)      // golden-duel melee only: never spawned, dropped or held in a slot
+    GrappleHook = 21, // pickup only: gives the grappling hook (kept until you die)
+    SmokeGrenade = 22, // throwable (slot 3): thick smoke cloud
+    RopeGrenade = 23,  // throwable (slot 3): snares everyone nearby in ropes
+    Molotov = 24,      // throwable (slot 3): bursts into a pool of fire on impact
 }
 
 /// <summary>Static stats for one weapon type. Distances in meters, angles in degrees, times in seconds.</summary>
@@ -105,8 +108,15 @@ public static class WeaponDefs
 {
     /// <summary>Number of real weapons (ids 0..Count-1). Fists come after and are not a pickup.</summary>
     public const int Count = 20;
-    public const int MaxGrenades = 4;
     public const float FragFuse = 3.2f;
+
+    // Throwables, carried in slot 3. Index = throwable type in the inventory.
+    public static readonly WeaponId[] Throwables = { WeaponId.FragGrenade, WeaponId.SmokeGrenade, WeaponId.RopeGrenade, WeaponId.Molotov };
+    public static readonly int[] MaxCarry = { 4, 2, 2, 2 };
+    public static int ThrowableIndex(WeaponId id) => System.Array.IndexOf(Throwables, id);
+    public const float SmokeFuse = 1.6f, SmokeSeconds = 16f, SmokeRadius = 5.5f;
+    public const float RopeFuse = 1.3f, RopeRadius = 15f, SnareSeconds = 10f;
+    public const float MolotovMaxFlight = 6f, FireRadius = 3.6f, FireSeconds = 8f, FireDps = 24f;
 
     public static readonly WeaponDef[] All =
     {
@@ -198,7 +208,7 @@ public static class WeaponDefs
             Id = WeaponId.FragGrenade, Name = "Frag Grenade", Caliber = "M67",
             Damage = 160, Projectile = ProjectileKind.Frag, IsThrowable = true,
             ExplosionRadius = 7f, ExplosionDamage = 170f,
-            MagSize = 2, SpareMags = 0,
+            MagSize = 2, SpareMags = 0, OneHanded = true, HipOffset = new Vector3(0.2f, -0.2f, 0.36f),
             PickupGlow = new Color(0.55f, 0.75f, 0.3f),
         },
         new WeaponDef
@@ -322,8 +332,27 @@ public static class WeaponDefs
         },
         new WeaponDef
         {
-            Id = WeaponId.GrappleHook, Name = "Grappling Hook", Caliber = "45 m line",
+            Id = WeaponId.GrappleHook, Name = "Grappling Hook", Caliber = "30 m line",
             MagSize = 0, SpareMags = 0, PickupGlow = new Color(0.3f, 0.9f, 1f),
+        },
+        new WeaponDef
+        {
+            Id = WeaponId.SmokeGrenade, Name = "Smoke Grenade", Caliber = "M18 smoke",
+            Projectile = ProjectileKind.Smoke, IsThrowable = true, MagSize = 1, SpareMags = 0,
+            OneHanded = true, HipOffset = new Vector3(0.2f, -0.2f, 0.36f), PickupGlow = new Color(0.85f, 0.85f, 0.9f),
+        },
+        new WeaponDef
+        {
+            Id = WeaponId.RopeGrenade, Name = "Rope Grenade", Caliber = "15 m snare",
+            Projectile = ProjectileKind.Rope, IsThrowable = true, MagSize = 1, SpareMags = 0,
+            OneHanded = true, HipOffset = new Vector3(0.2f, -0.2f, 0.36f), PickupGlow = new Color(0.95f, 0.7f, 0.35f),
+        },
+        new WeaponDef
+        {
+            Id = WeaponId.Molotov, Name = "Molotov", Caliber = "petrol bottle",
+            Projectile = ProjectileKind.Molotov, IsThrowable = true, MagSize = 1, SpareMags = 0,
+            OneHanded = true, HipOffset = new Vector3(0.2f, -0.24f, 0.34f), PickupGlow = new Color(1f, 0.45f, 0.1f),
+            RagdollImpulse = 60f, RagdollLift = 0.2f,
         },
     };
 
