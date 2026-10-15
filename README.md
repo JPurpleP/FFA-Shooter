@@ -8,7 +8,7 @@ lookout tower on the west ridge, ranger station and deer stand on the east one) 
 city grid (three streets × three avenues, 16 blocks): walk-in brick shops and apartments with stairs to the roofs, office
 and hotel tower lobbies, a two-level parking garage with ramps, a construction site with a crane, a warehouse with a
 mezzanine, a gas station, a fountain plaza and a basketball court, ringed by a skyline. Unity 6000.6, Built-in render pipeline,
-Netcode for GameObjects 2.13 + Unity Transport (host/client, online through Unity Relay or direct IP). Everything visual (map, weapons,
+Netcode for GameObjects 2.13 + Unity Transport (host/client, online through Unity Relay join codes). Everything visual (map, weapons,
 bodies, gore, sounds) is generated from code — no imported art or audio.
 
 ## Play
@@ -20,10 +20,9 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   Office Dad, Suburban Dad, Hitman, Street OG, Disco King, Ninja, Viking, Knight, Mime, Skater, Farmer, Lumberjack, Surgeon,
   Firefighter, Hazmat, WW2 German Soldier — 32 in all), **Settings** (sensitivity,
   field of view, volume, gore level). Choices are saved between launches; your skin syncs to everyone online.
-- **Online vs LAN.** Hosting **Online** goes through Unity Relay: the host gets a 6-letter join code (shown in the Esc menu,
-  with a copy button, and on the Tab leaderboard), friends type it into Join. No port forwarding, no IP addresses shared.
-  **LAN / Direct IP** listens on the port as before; friends type your address. Join accepts either a code or an address.
-  Online needs the project linked to Unity Gaming Services with Relay enabled (see *Online setup* below).
+- **Online play.** Hosting goes through Unity Relay: the host gets a 6-letter join code (shown in the lobby, the Esc menu
+  with a copy button, the HUD corner and the Tab leaderboard), friends type it into Join. No port forwarding, no IP
+  addresses shared. There is no LAN / direct-IP option in the menu (direct connections remain only as command-line test flags).
 - **Lobby.** Hosting or joining puts you in a waiting lobby (player list, join code). Everyone presses **Ready Up**; the
   host's **Start Match** unlocks once every player is ready. No bots in normal games (the F1 dev panel can still add them).
   Players who join mid-match drop straight in.
@@ -149,5 +148,5 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 1. Open the project in Unity 6000.6.5f1 and sign in with your Unity account.
 2. **Edit > Project Settings > Services**: pick your organization and **Create project ID** (or link an existing one).
 3. At [cloud.unity.com](https://cloud.unity.com), open that project and enable **Relay** (it has a free tier).
-4. Rebuild. Until this is done, Online hosting shows "Online play isn't set up yet" — LAN / Direct IP still works.
+4. Rebuild. Until this is done, hosting shows "Online play isn't set up yet".
 - Code: `Assets/Scripts/RelayConnect.cs` (anonymous sign-in, allocation, join codes, error messages); `GameUI.Host/Join`.

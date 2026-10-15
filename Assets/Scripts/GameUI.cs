@@ -11,7 +11,8 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Main menu (host / join), in-game HUD, scoreboard and pause menu, drawn with IMGUI.
 /// Also reads command-line flags for quick testing:
-///   -ffahost | -ffarelay | -ffaclient &lt;ip or join code&gt;   start immediately (-ffarelay hosts online with a join code)
+///   -ffahost | -ffarelay | -ffaclient &lt;ip or join code&gt;   start immediately (-ffarelay hosts online with a join code;
+///   -ffahost and IP joins are direct connections kept for automated tests only, the menu is online-only)
 ///   -ffaprofile &lt;name&gt;   separate Unity services sign-in, for several copies on one PC
 ///   -ffalobby   a command-line host starts in the waiting lobby like a menu host
 ///   -ffaready   ready up in the lobby   -ffastartwhenready   (host) start the match once everyone is ready
@@ -42,7 +43,6 @@ public partial class GameUI : MonoBehaviour
     string address = "";
     string port = "7777";
     string status = "";
-    string localAddresses = "";
     readonly List<(string text, float time)> killFeed = new();
     float hitMarkerTime = -10f, damageFlashTime = -10f, deathTime, winnerTime;
     bool hitMarkerHeadshot, hitMarkerKill, wasInGame, wasDead;
@@ -304,7 +304,6 @@ public partial class GameUI : MonoBehaviour
         instance = this;
         GameSettings.Load();
         LocalPlayerName = GameSettings.Name;
-        localAddresses = GetLocalIPv4Addresses();
     }
 
     void Start()
@@ -522,17 +521,6 @@ public partial class GameUI : MonoBehaviour
             return Dns.GetHostAddresses(host).FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork)?.ToString();
         }
         catch { return null; }
-    }
-
-    static string GetLocalIPv4Addresses()
-    {
-        try
-        {
-            return string.Join(", ", Dns.GetHostEntry(Dns.GetHostName()).AddressList
-                .Where(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a))
-                .Select(a => a.ToString()));
-        }
-        catch { return ""; }
     }
 
     static void SetCursorCaptured(bool captured)
@@ -822,8 +810,7 @@ public partial class GameUI : MonoBehaviour
         // Top-left: how friends join (online code, or the host's LAN address).
         if (!DevPanel.Open)
         {
-            string how = RelayConnect.Code != "" ? $"JOIN CODE  <b>{RelayConnect.Code}</b>"
-                : Net.IsServer && !string.IsNullOrEmpty(localAddresses) ? $"LAN GAME  ·  {localAddresses} : {port}" : "";
+            string how = RelayConnect.Code != "" ? $"JOIN CODE  <b>{RelayConnect.Code}</b>" : "";
             if (how != "") Shadowed(new Rect(12, 10, 500, 24), $"<size=13>{how}</size>", label, new Color(1, 1, 1, 0.75f));
         }
 
@@ -1029,7 +1016,7 @@ public partial class GameUI : MonoBehaviour
         Fill(new Rect(r.x, r.y, r.width, 3), Accent);
         string dots = new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
         GUI.Label(new Rect(r.x, r.y + 30, r.width, 40), $"CONNECTING{dots}", new GUIStyle(h3Style) { alignment = TextAnchor.MiddleCenter, fontSize = 24 });
-        GUI.Label(new Rect(r.x, r.y + 70, r.width, 24), RelayConnect.Code != "" ? $"Joining game {RelayConnect.Code}" : $"Joining {address}",
+        GUI.Label(new Rect(r.x, r.y + 70, r.width, 24), RelayConnect.Code != "" ? $"Joining game {RelayConnect.Code}" : "Joining game",
             new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter });
         var cancel = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
         if (GUI.Button(new Rect(r.x + 120, r.yMax - 62, 160, 42), "CANCEL", cancel))

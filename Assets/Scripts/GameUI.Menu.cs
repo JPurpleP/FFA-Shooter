@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 
 /// <summary>Main menu: Play (host / join), Customize (skins with a live 3D preview), Settings.</summary>
@@ -132,14 +133,7 @@ public partial class GameUI
         var hostRect = new Rect(r.x, y, col, boxH);
         Fill(hostRect, new Color(1f, 1f, 1f, 0.04f));
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 14, col - 36, 26), "HOST A GAME", h3Style);
-        // Online (Relay join code) or LAN / direct IP.
-        float modeW = (col - 36 - 8) / 2f;
-        if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + 46, modeW, 34), "ONLINE", GameSettings.HostOnline ? mapButtonActiveStyle : mapButtonStyle) && !GameSettings.HostOnline)
-        { GameSettings.HostOnline = true; GameSettings.Save(); }
-        if (GUI.Button(new Rect(hostRect.x + 26 + modeW, hostRect.y + 46, modeW, 34), "LAN / DIRECT IP", GameSettings.HostOnline ? mapButtonStyle : mapButtonActiveStyle) && GameSettings.HostOnline)
-        { GameSettings.HostOnline = false; GameSettings.Save(); }
-        GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 84, col - 36, 22),
-            GameSettings.HostOnline ? "Friends join anywhere with a 6-letter code." : "Friends join with your address and port below.", smallStyle);
+        GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 46, col - 36, 56), "Start an online game. You'll get a 6-letter code; friends join with it from anywhere.", bodyStyle);
         // Map choice (also switches the fly-over behind the menu).
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 110, 200, 20), "MAP", smallStyle);
         float mapW = (col - 36 - 8 * (MapCatalog.Count - 1)) / MapCatalog.Count;
@@ -157,7 +151,7 @@ public partial class GameUI
         if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + boxH - 70, col - 36, 50), connecting ? "CONNECTING…" : "HOST GAME", bigButtonStyle))
         {
             LocalPlayerName = GameSettings.Name;
-            Host(GameSettings.HostOnline, lobby: true);
+            Host(online: true, lobby: true);
         }
         GUI.enabled = true;
 
@@ -165,21 +159,22 @@ public partial class GameUI
         var joinRect = new Rect(r.x + col + 30, y, col, boxH);
         Fill(joinRect, new Color(1f, 1f, 1f, 0.04f));
         GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 14, col - 36, 26), "JOIN A GAME", h3Style);
-        GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 46, 200, 20), "JOIN CODE OR ADDRESS", smallStyle);
-        var addressRect = new Rect(joinRect.x + 18, joinRect.y + 68, col - 130, 40);
-        GUI.SetNextControlName("JoinAddress");
-        address = GUI.TextField(addressRect, address, 64, fieldStyle);
-        if (address.Length == 0 && GUI.GetNameOfFocusedControl() != "JoinAddress")
-            GUI.Label(new Rect(addressRect.x + 13, addressRect.y, addressRect.width - 20, addressRect.height), "Code or IP address",
-                new GUIStyle(fieldStyle) { normal = { background = null, textColor = new Color(1f, 1f, 1f, 0.3f) } });
-        bool byCode = RelayConnect.LooksLikeJoinCode(address);
-        GUI.enabled = !byCode;
-        GUI.Label(new Rect(joinRect.x + col - 102, joinRect.y + 46, 80, 20), "PORT", smallStyle);
-        port = GUI.TextField(new Rect(joinRect.x + col - 102, joinRect.y + 68, 84, 40), port, 5, fieldStyle);
-        GUI.enabled = true;
-        GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 124, col - 36, 66),
-            "Type the host's 6-letter join code, or their IP address for a LAN game. You play on whichever map the host picked.", bodyStyle);
-        GUI.enabled = !connecting;
+        GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 46, 200, 20), "JOIN CODE", smallStyle);
+        var codeRect = new Rect(joinRect.x + 18, joinRect.y + 68, col - 36, 52);
+        var codeStyle = new GUIStyle(fieldStyle) { fontSize = 28, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        // Enter joins (checked before the text field eats the key).
+        bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
+                     && GUI.GetNameOfFocusedControl() == "JoinCode";
+        GUI.SetNextControlName("JoinCode");
+        string typed = GUI.TextField(codeRect, address, 6, codeStyle);
+        address = new string(typed.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant(); // codes are 6 letters / digits
+        if (address.Length == 0 && GUI.GetNameOfFocusedControl() != "JoinCode")
+            GUI.Label(codeRect, "ABC123", new GUIStyle(codeStyle) { normal = { background = null, textColor = new Color(1f, 1f, 1f, 0.2f) } });
+        GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 134, col - 36, 66),
+            "Ask the host for their code. You play on whichever map the host picked.", bodyStyle);
+        bool codeReady = RelayConnect.LooksLikeJoinCode(address);
+        if (enter && codeReady && !connecting) { LocalPlayerName = GameSettings.Name; Join(); }
+        GUI.enabled = !connecting && codeReady;
         if (GUI.Button(new Rect(joinRect.x + 18, joinRect.y + boxH - 70, col - 36, 50), connecting ? "CONNECTING…" : "JOIN GAME", bigButtonStyle))
         {
             LocalPlayerName = GameSettings.Name;
@@ -188,10 +183,8 @@ public partial class GameUI
         GUI.enabled = true;
         y += boxH + 16;
 
-        if (!GameSettings.HostOnline && !string.IsNullOrEmpty(localAddresses))
-            GUI.Label(new Rect(r.x, y, r.width, 22), $"Your LAN address: <b>{localAddresses}</b>   ·   port {port}", bodyStyle);
         if (!string.IsNullOrEmpty(status))
-            GUI.Label(new Rect(r.x, y + 26, r.width, 44), connecting ? status : $"<color=#ff8a80>{status}</color>", bodyStyle);
+            GUI.Label(new Rect(r.x, y, r.width, 44), connecting ? status : $"<color=#ff8a80>{status}</color>", bodyStyle);
     }
 
     // ------------------------------------------------------------------ Lobby
