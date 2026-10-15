@@ -7,7 +7,8 @@ public static partial class ProjectBuilder
 {
     // ================================================================== Downtown (city map)
     //
-    // Same playable footprint as the other maps (X -68..68, Z -46..66). Three east-west streets (1st St z=-22,
+    // Same playable footprint as the other maps (X -90..90, Z -64..84; the original grid sits inside X -68..68, Z -46..66,
+    // ringed by outer avenues at x = +-73 and outer streets at z = -51 and 70 with a band of blocks beyond them). Three east-west streets (1st St z=-22,
     // Main St z=10, 3rd St z=44) cross three avenues (West Ave x=-38, Center Ave x=0, East Ave x=38), leaving a
     // 4x4 grid of blocks. Blocks hold enterable two-storey shops and apartments with stairs to the roof, tower
     // lobbies, a parking garage with ramps, a construction site, a warehouse, a gas station, a plaza and a court.
@@ -22,8 +23,10 @@ public static partial class ProjectBuilder
     static readonly float[] StreetW = { 10f, 12f, 10f };
 
     // Block bands between roads (including sidewalks).
-    static readonly (float a, float b)[] BlockX = { (-68f, -43f), (-33f, -6f), (6f, 33f), (43f, 68f) };
-    static readonly (float a, float b)[] BlockZ = { (-46f, -27f), (-17f, 4f), (16f, 39f), (49f, 66f) };
+    static readonly (float a, float b)[] BlockX = { (-90f, -78f), (-68f, -43f), (-33f, -6f), (6f, 33f), (43f, 68f), (78f, 90f) };
+    static readonly (float a, float b)[] BlockZ = { (-64f, -56f), (-46f, -27f), (-17f, 4f), (16f, 39f), (49f, 66f), (74f, 84f) };
+    static readonly float[] OuterAvenueX = { -73f, 73f };
+    static readonly float[] OuterStreetZ = { -51f, 70f };
     const float Curb = 0.15f;
 
     static void BuildCity()
@@ -52,6 +55,16 @@ public static partial class ProjectBuilder
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
                 Crosswalks(AvenueX[i], StreetZ[j], AvenueW[i] / 2f, StreetW[j] / 2f);
+        // The outer ring roads.
+        foreach (float x in OuterAvenueX)
+            for (float z = MapMinZ + 4f; z < MapMaxZ - 4f; z += 4.5f)
+                if (!NearStreet(z) && Mathf.Abs(z - OuterStreetZ[0]) > 6f && Mathf.Abs(z - OuterStreetZ[1]) > 6f)
+                    Box(world, "LaneDash", new Vector3(x, 0.012f, z), new Vector3(0.15f, 0.01f, 2f), M("Trim"), collider: false);
+        foreach (float z in OuterStreetZ)
+            for (float x = MapMinX + 4f; x < MapMaxX - 4f; x += 4.5f)
+                if (!NearAvenue(x) && Mathf.Abs(Mathf.Abs(x) - 73f) > 6f)
+                    Box(world, "LaneDash", new Vector3(x, 0.012f, z), new Vector3(2f, 0.01f, 0.15f), M("Trim"), collider: false);
+        BuildCityOuterRing(rng);
 
         // ---------------------------------------------------------------- blocks
         // Row 1 (south, along 1st St)
@@ -168,6 +181,10 @@ public static partial class ProjectBuilder
             new Vector3(-55f, 0.05f, 44f), new Vector3(55f, 0.05f, 44f), new Vector3(-20f, 0.05f, 44f), new Vector3(20f, 0.05f, 44f),
             new Vector3(21.5f, Curb + 0.05f, 19.5f), new Vector3(-19f, Curb + 0.05f, -29f), new Vector3(56.5f, Curb + 0.05f, -37.5f), new Vector3(-49f, Curb + 0.05f, 52f),
             new Vector3(62f, Curb + 0.05f, 54f), new Vector3(-64f, Curb + 0.05f, -2f), new Vector3(52f, Curb + 0.05f, -1f), new Vector3(-62f, Curb + 0.05f, 31f),
+            // Outer ring roads (bigger map)
+            new Vector3(-73f, 0.05f, -38f), new Vector3(-73f, 0.05f, 28f), new Vector3(73f, 0.05f, -8f), new Vector3(73f, 0.05f, 58f),
+            new Vector3(-28f, 0.05f, -51f), new Vector3(30f, 0.05f, -51f), new Vector3(-20f, 0.05f, 70f), new Vector3(44f, 0.05f, 70f),
+            new Vector3(-73f, 0.05f, 70f), new Vector3(73f, 0.05f, -51f),
         };
         foreach (var p in spawnPos)
         {
@@ -183,6 +200,64 @@ public static partial class ProjectBuilder
         Box(world, "Invisible Wall", new Vector3(0f, 40f, MapMinZ - 0.2f), new Vector3(w + 1f, 100f, 0.3f), null);
         Box(world, "Invisible Wall", new Vector3(MapMinX - 0.2f, 40f, cz), new Vector3(0.3f, 100f, d + 1f), null);
         Box(world, "Invisible Wall", new Vector3(MapMaxX + 0.2f, 40f, cz), new Vector3(0.3f, 100f, d + 1f), null);
+    }
+
+    // ------------------------------------------------------------------ outer ring (the bigger map)
+
+    /// <summary>
+    /// Fills the band of blocks outside the original grid: enterable shops and walk-ups (stairs to the roof) mixed with
+    /// solid buildings, all facing in toward the ring roads, plus parked cars and barriers on those roads.
+    /// </summary>
+    static void BuildCityOuterRing(System.Random rng)
+    {
+        float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+        var names = new[] { "Hardware Store", "Bakery", "Barber", "Tailor", "Bookshop", "Deli", "Florist", "Arcade", "Pharmacy", "Tattoo Parlor", "Pet Shop", "Thrift Store" };
+        var awnings = new[] { "TruckRed", "TentBlue", "TentGreen", "TentOrange" };
+        var facades = new[] { M("FacadeBrick"), M("FacadeConcrete"), M("FacadeGlass") };
+        int k = 0;
+        foreach (var bx in BlockX)
+            foreach (var bz in BlockZ)
+            {
+                bool outerX = bx.a < CoreMinX || bx.b > CoreMaxX, outerZ = bz.a < CoreMinZ || bz.b > CoreMaxZ;
+                if (!outerX && !outerZ) continue; // the original grid is built by hand above
+                float cx = (bx.a + bx.b) / 2f, cz = (bz.a + bz.b) / 2f, w = bx.b - bx.a, d = bz.b - bz.a;
+                // Face the ring road: side bands face in along X, the south/north bands along Z.
+                bool alongZ = outerX; // the long side of a side-band block runs along Z
+                float yaw = outerX ? (cx < 0f ? 0f : 180f) : (cz < 0f ? -90f : 90f);
+                float depth = (alongZ ? w : d) - 2f, length = (alongZ ? d : w) - 2f;
+                if (depth < 5f || length < 5f) continue;
+                // Split the block's length into buildings 9-14 m wide with 2 m gaps.
+                float start = -length / 2f;
+                while (start < length / 2f - 6f)
+                {
+                    float bw = Mathf.Min(R(9f, 14f), length / 2f - start);
+                    if (bw < 6f) break;
+                    float along = start + bw / 2f;
+                    var pos = alongZ ? new Vector3(cx, Curb, cz + along) : new Vector3(cx + along, Curb, cz);
+                    if (k % 3 == 2 || depth < 8f)
+                    {
+                        // Solid building: cover and a landmark, no interior.
+                        float hgt = R(7f, 16f);
+                        var size = alongZ ? new Vector3(depth, hgt, bw) : new Vector3(bw, hgt, depth);
+                        Facade(world, "Outer Building", pos + Vector3.up * hgt / 2f, size, facades[rng.Next(facades.Length)]);
+                        Box(world, "Outer Roof", pos + Vector3.up * (hgt + 0.15f), size + new Vector3(0f, 0.3f - hgt, 0f), M("CityRoof"), collider: false);
+                    }
+                    else
+                        BuildShop(names[k % names.Length], pos, yaw, depth, bw, 1 + rng.Next(2), k % 2 == 0 ? "store" : "apartment",
+                            M("CityBrick"), M(awnings[rng.Next(awnings.Length)]));
+                    k++;
+                    start += bw + 2f;
+                }
+            }
+
+        // Parked cars, a wreck and barriers on the ring roads.
+        var mats = new[] { "CarCream", "CarGreen", "BusBlue", "TruckRed", "BusWhite" };
+        foreach (var (x, z, yaw) in new[] { (-70.5f, -20f, 0f), (-75.5f, 44f, 180f), (70.5f, 30f, 0f), (75.5f, -36f, 180f),
+                                            (-50f, -48.5f, 90f), (14f, -53.5f, -90f), (-36f, 72.5f, 90f), (52f, 67.5f, -90f) })
+            BuildCar(world, "Parked Car", new Vector3(x, 0.02f, z), yaw + R(-4f, 4f), M(mats[rng.Next(mats.Length)]));
+        BuildCar(world, "Wrecked Car", new Vector3(73f, 0.02f, 20f), 40f, M("TruckRed"), true);
+        foreach (var (x, z, yaw) in new[] { (-73f, 6f, 5f), (73f, 44f, -8f), (0f, -51f, 85f), (-50f, 70f, 95f), (40f, -51f, 80f) })
+            JerseyBarrier(new Vector3(x, 0f, z), yaw);
     }
 
     // ------------------------------------------------------------------ road details

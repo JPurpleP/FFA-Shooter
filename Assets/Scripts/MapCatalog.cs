@@ -13,7 +13,7 @@ public class MapCatalog : MonoBehaviour
         public string name;
         public string description;
         public GameObject root;
-        public Rect navBounds = new(-68f, -46f, 136f, 112f);
+        public Rect navBounds = new(-90f, -64f, 180f, 148f);
         public Color fogColor = new(0.78f, 0.8f, 0.82f);
         public float fogStart = 130f, fogEnd = 600f;
         public Color ambientSky = new(0.62f, 0.68f, 0.78f);
@@ -23,7 +23,7 @@ public class MapCatalog : MonoBehaviour
         public float sunIntensity = 1.15f;
         public Vector3 sunEuler = new(48f, -40f, 0f);
         public Vector3 orbitCenter = new(0f, 2f, 10f);
-        public float orbitRadius = 95f, orbitHeight = 58f;
+        public float orbitRadius = 124f, orbitHeight = 74f;
     }
 
     public Entry[] maps;

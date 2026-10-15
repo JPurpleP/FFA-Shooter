@@ -8,7 +8,7 @@ public static partial class ProjectBuilder
 {
     // ================================================================== Camp Timberline (forest map)
     //
-    // Same playable footprint as Fluketown (X -68..68, Z -46..66). A summer camp sits in a flat clearing in the middle
+    // Same playable footprint as Fluketown (MapMinX..MapMaxX, MapMinZ..MapMaxZ: X -90..90, Z -64..84). A summer camp sits in a flat clearing in the middle
     // (mess hall, cabins, campfire), a pond with a dock lies to the south, the parking lot and gate to the north, and
     // wooded hills climb along the west and east edges: a fire lookout tower on the west ridge, a ranger station and
     // deer stand on the east one. Trees everywhere outside the clearing.
@@ -192,6 +192,11 @@ public static partial class ProjectBuilder
         var lookout = BuildLookout(CampG(-52f, 14f), 0f);
         Clear(-52f, 14f, 7.5f);
         var stand = BuildDeerStand(CampG(54f, 34f), 180f);
+        // Two more stands out in the woods the bigger map added.
+        BuildDeerStand(CampG(-78f, -38f), 90f);
+        Clear(-78f, -38f, 4f);
+        BuildDeerStand(CampG(78f, 68f), 270f);
+        Clear(78f, 68f, 4f);
         Clear(54f, 34f, 6f);
         BuildLeanTo(CampG(-46f, -26f), 30f);
         Clear(-46f, -26f, 4.5f);
@@ -250,6 +255,9 @@ public static partial class ProjectBuilder
             new Vector2(-45f, 0f), new Vector2(-44f, 30f), new Vector2(-58f, 52f), new Vector2(-57f, -38f), new Vector2(-34f, -12f), new Vector2(-36f, 44f),
             // East hill
             new Vector2(44f, 10f), new Vector2(45f, 46f), new Vector2(58f, -30f), new Vector2(37f, -22f), new Vector2(35f, 30f), new Vector2(60f, 58f),
+            // Outer woods (the bigger map): ridge tops, the far south and the north end
+            new Vector2(-78f, -10f), new Vector2(-80f, 40f), new Vector2(-74f, 74f), new Vector2(-70f, -56f), new Vector2(78f, 0f), new Vector2(80f, 44f),
+            new Vector2(72f, 76f), new Vector2(70f, -56f), new Vector2(-30f, -58f), new Vector2(30f, -58f), new Vector2(-30f, 76f),
         };
         foreach (var p in spawnXZ)
         {
@@ -269,9 +277,9 @@ public static partial class ProjectBuilder
         // A big rock on the east ridge, outcrops along both ridges, and loose boulders on the slopes.
         Boulder(new Vector3(58f, CampHeight(58f, 14f) - 1.2f, 14f), 7f, 3.6f, 20f, 0);
         Clear(58f, 14f, 5f);
-        for (int i = 0, tries = 0; i < 42 && tries < 1000; tries++)
+        for (int i = 0, tries = 0; i < 70 && tries < 2000; tries++)
         {
-            var p = new Vector2(R(-66f, 66f), R(-44f, 64f));
+            var p = new Vector2(R(MapMinX + 2f, MapMaxX - 2f), R(MapMinZ + 2f, MapMaxZ - 2f));
             if (HillAmount(p.x) < 0.2f || IsClear(p) || PathDistance(p) < 1.5f) continue;
             float size = R(1.2f, 3.2f);
             Boulder(new Vector3(p.x, CampHeight(p.x, p.y) - size * 0.2f, p.y), size, size * R(0.5f, 0.85f), R(0f, 360f), rng.Next(3));
@@ -284,9 +292,9 @@ public static partial class ProjectBuilder
         }
 
         // Fallen logs for cover in the woods.
-        for (int i = 0, tries = 0; i < 18 && tries < 500; tries++)
+        for (int i = 0, tries = 0; i < 32 && tries < 1000; tries++)
         {
-            var p = new Vector2(R(-64f, 64f), R(-42f, 62f));
+            var p = new Vector2(R(MapMinX + 4f, MapMaxX - 4f), R(MapMinZ + 4f, MapMaxZ - 4f));
             if (InClearing(p) || IsClear(p) || PathDistance(p) < 3f) continue;
             float len = R(4f, 7.5f), r = R(0.3f, 0.45f), yaw = R(0f, 180f);
             var log = Cylinder(world, "Fallen Log", CampG(p.x, p.y, r * 0.8f), r, len, M("Bark"));
@@ -304,8 +312,8 @@ public static partial class ProjectBuilder
         var trees = new GameObject("Trees").transform;
         trees.SetParent(world, false);
         int treeCount = 0;
-        for (float gx = -104f; gx <= 104f; gx += 4.3f)
-            for (float gz = -84f; gz <= 104f; gz += 4.3f)
+        for (float gx = MapMinX - 36f; gx <= MapMaxX + 36f; gx += 4.3f)
+            for (float gz = MapMinZ - 38f; gz <= MapMaxZ + 38f; gz += 4.3f)
             {
                 var p = new Vector2(gx + R(-1.8f, 1.8f), gz + R(-1.8f, 1.8f));
                 bool inside = InPlayArea(p, 1.5f);
@@ -327,8 +335,8 @@ public static partial class ProjectBuilder
                 treeCount++;
             }
         // Bushes: concealment you can push through (no colliders).
-        for (float gx = -66f; gx <= 66f; gx += 6.5f)
-            for (float gz = -44f; gz <= 64f; gz += 6.5f)
+        for (float gx = MapMinX + 2f; gx <= MapMaxX - 2f; gx += 6.5f)
+            for (float gz = MapMinZ + 2f; gz <= MapMaxZ - 2f; gz += 6.5f)
             {
                 var p = new Vector2(gx + R(-2.5f, 2.5f), gz + R(-2.5f, 2.5f));
                 if (rng.NextDouble() > (InClearing(p) ? 0.12 : 0.5)) continue;
@@ -356,7 +364,7 @@ public static partial class ProjectBuilder
     /// <summary>Walkable ground: 1 m grid over the play area and a margin, grass and dirt (trails, pond bed) submeshes.</summary>
     static void BuildCampGround()
     {
-        const float x0 = -100f, x1 = 100f, z0 = -80f, z1 = 100f, step = 1f;
+        const float x0 = MapMinX - 34f, x1 = MapMaxX + 34f, z0 = MapMinZ - 34f, z1 = MapMaxZ + 34f, step = 1f; // ~55k verts (16-bit index limit is 65k)
         int nx = Mathf.RoundToInt((x1 - x0) / step) + 1, nz = Mathf.RoundToInt((z1 - z0) / step) + 1;
         var mb = new MeshBuilder(2);
         for (int i = 0; i < nx; i++)
@@ -398,7 +406,7 @@ public static partial class ProjectBuilder
             for (int j = 0; j + 1 < n; j++)
             {
                 float cx = -r + (i + 0.5f) * step, cz = -r + (j + 0.5f) * step;
-                if (cx > -100f && cx < 100f && cz > -80f && cz < 100f) continue;
+                if (cx > MapMinX - 34f && cx < MapMaxX + 34f && cz > MapMinZ - 34f && cz < MapMaxZ + 34f) continue;
                 int a = i * n + j, b = a + 1, c = a + n + 1, d = a + n;
                 mb.Tri(0, a, b, c);
                 mb.Tri(0, a, c, d);

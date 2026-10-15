@@ -1,6 +1,6 @@
 # FFA Shooter
 
-Online free-for-all first-person shooter with three maps of the same size (about 136 × 112 m). **Fluketown** is a
+Online free-for-all first-person shooter with three maps of the same size (180 × 148 m). **Fluketown** is a
 Nuketown-style suburb: the original cul-de-sac block plus a north avenue, two side streets, eight more houses, a south
 park, playground, court and water tower. **Timberline** is a summer camp in a forested valley: mess hall, four cabins,
 campfire, tents, a pond with a dock, a parking lot and gate, and wooded hills along the west and east edges (fire
@@ -30,9 +30,9 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   firing, hooking or throwing ends it early. A "PROTECTED" tag shows over protected enemies in your line of sight.
 - **Killcam:** when someone kills you, the last ~3 seconds are replayed through their eyes (with their gun), with you
   walking your last steps, before you respawn.
-- First to 25 kills wins; after 8 seconds everyone goes back to the lobby to ready up for the next match. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
+- **Kills heal 40 HP.** The host picks the score to win in the lobby (10-100, default 25). After a win, 8 seconds later everyone goes back to the lobby to ready up for the next match. Hold Tab for the leaderboard (rank, kills, deaths, K/D, progress to 25).
 - Controls: WASD · Shift sprint · Space jump · LMB fire · RMB aim (scope on the Barrett) · **Q/E lean** · R reload ·
-  F pick up / swap · 1/2/3 or mouse wheel to switch (3 = throwables; press 3 again for the next type) · LMB with slot 3 out or **hold T** from any slot, release to throw · Tab scores · Esc menu (resume, sensitivity / FOV / volume, join code, leave)
+  F pick up / swap · 1/2/3 or mouse wheel to switch (3 = throwables; press 3 again for the next type) · LMB with slot 3 out or **hold T** from any slot, release to throw · Tab scores · Esc menu (resume, Options: general / controls / rebindable keys, join code, leave)
 - Leaning moves your head (and its hitbox) out from cover; it stops short of walls.
 - **Ctrl**: tap (or press while standing still / walking) to crouch or stand. **Hold Ctrl while sprinting to slide** —
   a burst of speed that decays; keep holding to end in a crouch, Space to slide-jump. **Hold Ctrl in the air** and you
@@ -46,7 +46,7 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
 Kills since your last death count as a streak (shown bottom-left, with the next reward). Each reward lasts 30 s.
 - **3 in a row: Speed hack.** Double running, walking and sliding speed.
 - **5 in a row: ESP.** Every enemy is outlined through walls: box, name, distance, health bar and their live skeleton.
-- **8 in a row: Flyhack.** No gravity: Space rises, Ctrl sinks (kept under 45 m and inside the map). When it ends, you fall.
+- **8 in a row: Flyhack.** No gravity: Jump rises, Crouch sinks, at 1.5x the climb speed and double horizontal speed (kept under 45 m and inside the map). When it ends, you fall.
 - **10 in a row: Aimbot.** Your aim snaps to the head of the visible enemy nearest your crosshair.
 Dying resets the streak (running rewards finish their 30 s); a new match clears everything. Bots earn them too (perfect
 aim / hunting you through walls / speed; bots don't fly).
@@ -86,7 +86,7 @@ rounds and 12 gauge kick hard (the biggest also jolt the view).
 
 **Pickups are completely random.** Every map has ~32 spawn spots spread evenly over ground you can walk to (streets,
 yards, ground floors, trails — not roofs), picked automatically when the map is built. Each roll is any weapon from the
-table (not the Glock); every weapon has an equal share except the golden Deagle, which has a double share, and a new roll every time it respawns (60 s after being taken).
+table (not the Glock); every weapon has an equal share except the golden Deagle, which has a double share. About 66 gun spawners per map; each respawns 30 s after being taken, at a new random spot on the map with a new roll.
 
 **Golden duel.** Hit someone with the golden Deagle and you're both pulled into a boxing ring in an underground fight
 club, at full health, fists only (LMB punches, hold to keep swinging; head punches hit harder). Fight to the death: after

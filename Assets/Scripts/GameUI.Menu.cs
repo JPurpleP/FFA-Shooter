@@ -93,7 +93,7 @@ public partial class GameUI
         if (GUI.Button(new Rect(48, y, 304, 52), "QUIT", navStyle)) QuitGame();
 
         GUI.Label(new Rect(50, h - 96, 330, 80),
-            "Esc menu > Options > Keybindings to change keys" + (DevPanel.Enabled ? " · F1 dev panel" : ""),
+            "Settings > Keybindings (or Esc > Options in game) to change keys" + (DevPanel.Enabled ? " · F1 dev panel" : ""),
             new GUIStyle(smallStyle) { fontStyle = FontStyle.Normal, wordWrap = true });
 
         var panel = new Rect(450, 84, Mathf.Min(w - 500, 780), h - 160);

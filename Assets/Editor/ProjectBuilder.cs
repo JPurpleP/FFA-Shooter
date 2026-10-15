@@ -990,8 +990,8 @@ public static partial class ProjectBuilder
         passages.Clear();
         BuildNuketown();
         PlaceWeaponSpawners("Fluketown", 68);
-        PlaceHookSpawners("Fluketown", 6);
-        PlaceGrenadeSpawners("Fluketown", 10);
+        PlaceHookSpawners("Fluketown", 8);
+        PlaceGrenadeSpawners("Fluketown", 16);
         var fluketown = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, -2.5f), new Vector3(90f, 30f, 70f));
         ValidateDoorways("Fluketown");
@@ -1000,8 +1000,8 @@ public static partial class ProjectBuilder
         passages.Clear();
         BuildCampground();
         PlaceWeaponSpawners("Timberline", 64, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
-        PlaceHookSpawners("Timberline", 6, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
-        PlaceGrenadeSpawners("Timberline", 10, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
+        PlaceHookSpawners("Timberline", 8, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
+        PlaceGrenadeSpawners("Timberline", 16, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         var camp = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, 12f), new Vector3(100f, 30f, 90f));
         ValidateDoorways("Timberline");
@@ -1010,8 +1010,8 @@ public static partial class ProjectBuilder
         passages.Clear();
         BuildCity();
         PlaceWeaponSpawners("Downtown", 68);
-        PlaceHookSpawners("Downtown", 6);
-        PlaceGrenadeSpawners("Downtown", 10);
+        PlaceHookSpawners("Downtown", 8);
+        PlaceGrenadeSpawners("Downtown", 16);
         var city = world.gameObject;
         AddProbe(world, new Vector3(0f, 8f, 10f), new Vector3(140f, 40f, 115f));
         ValidateDoorways("Downtown");
@@ -1054,7 +1054,7 @@ public static partial class ProjectBuilder
                 fogColor = new Color(0.63f, 0.7f, 0.7f), fogStart = 45f, fogEnd = 290f,
                 ambientSky = new Color(0.55f, 0.65f, 0.74f), ambientEquator = new Color(0.45f, 0.5f, 0.42f), ambientGround = new Color(0.22f, 0.24f, 0.18f),
                 sunColor = new Color(1f, 0.92f, 0.78f), sunIntensity = 1.1f, sunEuler = new Vector3(40f, -60f, 0f),
-                orbitCenter = new Vector3(0f, 3f, 8f), orbitRadius = 80f, orbitHeight = 46f,
+                orbitCenter = new Vector3(0f, 3f, 10f), orbitRadius = 104f, orbitHeight = 60f,
             },
             new MapCatalog.Entry
             {
@@ -1062,7 +1062,7 @@ public static partial class ProjectBuilder
                 fogColor = new Color(0.72f, 0.74f, 0.78f), fogStart = 80f, fogEnd = 450f,
                 ambientSky = new Color(0.6f, 0.65f, 0.72f), ambientEquator = new Color(0.5f, 0.5f, 0.5f), ambientGround = new Color(0.28f, 0.27f, 0.26f),
                 sunColor = new Color(1f, 0.96f, 0.9f), sunIntensity = 1.15f, sunEuler = new Vector3(52f, 28f, 0f),
-                orbitCenter = new Vector3(0f, 6f, 10f), orbitRadius = 105f, orbitHeight = 75f,
+                orbitCenter = new Vector3(0f, 6f, 10f), orbitRadius = 136f, orbitHeight = 96f,
             },
         };
 
@@ -1132,8 +1132,11 @@ public static partial class ProjectBuilder
 
     static Transform world;
 
-    // Map bounds (playable): X -68..68, Z -46..66 — about 3x the original neighborhood.
-    public const float MapMinX = -68f, MapMaxX = 68f, MapMinZ = -46f, MapMaxZ = 66f;
+    // Map bounds (playable): X -90..90, Z -64..84 (180 x 148 m). Grown by a third from the old X -68..68, Z -46..66:
+    // each map keeps its original layout in the middle and gains an outer ring.
+    public const float MapMinX = -90f, MapMaxX = 90f, MapMinZ = -64f, MapMaxZ = 84f;
+    // The old boundary, still used by layouts that sit inside it.
+    const float CoreMinX = -68f, CoreMaxX = 68f, CoreMinZ = -46f, CoreMaxZ = 66f;
 
     static void BuildNuketown()
     {
@@ -1217,6 +1220,7 @@ public static partial class ProjectBuilder
         BuildBus(new Vector3(0f, 0f, 21f));
         BuildSemi(new Vector3(2.2f, 0f, 0f));
         BuildTownSign(new Vector3(-9.2f, 0f, -11f));
+        BuildFluketownOuterRing();
         foreach (var p in new[] { new Vector3(-7.8f, 0f, 14.5f), new Vector3(7.8f, 0f, -12.5f), new Vector3(-8f, 0f, -13f), new Vector3(8f, 0f, 16f),
                                   new Vector3(-30f, 0f, 43f), new Vector3(20f, 0f, 43f), new Vector3(43f, 0f, -20f), new Vector3(-43f, 0f, 20f) })
             Cylinder(world, "TrashCan", p + Vector3.up * 0.5f, 0.32f, 1f, M("Metal"));
@@ -1258,6 +1262,10 @@ public static partial class ProjectBuilder
             new Vector3(-56f, 0.05f, -2f), new Vector3(56f, 0.05f, 2f),
             // Parks and the south lane
             new Vector3(-30f, 0.05f, -32f), new Vector3(30f, 0.05f, -34f), new Vector3(-50f, 0.05f, -42f), new Vector3(50f, 0.05f, -42f),
+            // Outer ring (bigger map): ring road, south lots, north strip
+            new Vector3(-73f, 0.05f, -45f), new Vector3(-73f, 0.05f, 7f), new Vector3(-73f, 0.05f, 52f), new Vector3(73f, 0.05f, -30f),
+            new Vector3(73f, 0.05f, 22f), new Vector3(73f, 0.05f, 70f), new Vector3(-40f, 0.05f, -57f), new Vector3(2f, 0.05f, -58f),
+            new Vector3(42f, 0.05f, -57f), new Vector3(-50f, 0.05f, 79f), new Vector3(0f, 0.05f, 79f), new Vector3(50f, 0.05f, 79f),
         };
         foreach (var p in spawnPositions)
         {
@@ -1266,6 +1274,95 @@ public static partial class ProjectBuilder
             sp.transform.SetPositionAndRotation(p, Quaternion.Euler(0f, Mathf.Atan2(-p.x, -p.z) * Mathf.Rad2Deg, 0f));
             sp.AddComponent<SpawnPoint>();
         }
+    }
+
+    /// <summary>
+    /// The ring the bigger map added around the original neighborhood: a ring road just inside the fence, a row of
+    /// houses down each side, parking lots and sheds along the south, and a tree-lined strip along the north.
+    /// </summary>
+    static void BuildFluketownOuterRing()
+    {
+        var rng = new System.Random(77);
+        float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+        // Ring road (8 m), joined to the old avenue (z 36) and the south lane (z -40).
+        foreach (float sx in new[] { -73f, 73f })
+        {
+            Box(world, "Ring Road", new Vector3(sx, -0.03f, 10f), new Vector3(8f, 0.1f, 132f), M("Asphalt"));
+            for (float z = -52f; z < 74f; z += 4.5f)
+                Box(world, "LaneDash", new Vector3(sx, 0.025f, z), new Vector3(0.15f, 0.01f, 2f), M("Trim"), collider: false);
+        }
+        Box(world, "Ring Road S", new Vector3(0f, -0.03f, -50f), new Vector3(154f, 0.1f, 6f), M("Asphalt"));
+        Box(world, "Ring Road N", new Vector3(0f, -0.03f, 72f), new Vector3(154f, 0.1f, 6f), M("Asphalt"));
+        Box(world, "Lane Link W", new Vector3(-62.5f, -0.03f, -40f), new Vector3(21f, 0.1f, 6f), M("Asphalt"));
+        Box(world, "Lane Link E", new Vector3(62.5f, -0.03f, -40f), new Vector3(21f, 0.1f, 6f), M("Asphalt"));
+
+        // A row of houses down each side, facing the ring road.
+        var sidings = new[] { "SidingYellow", "SidingGreen", "SidingBlue", "SidingPink", "SidingWhite" };
+        var roofs = new[] { "Roof", "RoofRed" };
+        var cars = new[] { "CarCream", "CarGreen", "BusBlue", "TruckRed" };
+        int n = 0;
+        foreach (float z in new[] { -46f, -24f, -2f, 20f, 42f, 64f })
+        {
+            BuildHouse($"Ring House W{n}", new Vector3(-84f, 0f, z), 0f, M(sidings[n % 5]), M(roofs[n % 2]), M(cars[n % 4]),
+                backyard: false, frontYard: false, drivewayLength: 2f);
+            BuildHouse($"Ring House E{n}", new Vector3(84f, 0f, -z + 20f), 180f, M(sidings[(n + 2) % 5]), M(roofs[(n + 1) % 2]), M(cars[(n + 1) % 4]),
+                backyard: false, frontYard: false, drivewayLength: 2f);
+            n++;
+        }
+
+        // South strip: two parking lots with parked cars, sheds and a field between them.
+        foreach (float cx in new[] { -50f, 50f })
+        {
+            Box(world, "Parking Lot", new Vector3(cx, -0.025f, -58.5f), new Vector3(34f, 0.1f, 10f), M("Asphalt"));
+            for (int i = 0; i < 6; i++)
+            {
+                float x = cx - 14f + i * 5.6f;
+                Box(world, "Parking Line", new Vector3(x - 2.8f, 0.03f, -59f), new Vector3(0.12f, 0.01f, 5f), M("Trim"), collider: false);
+                if (rng.NextDouble() < 0.6)
+                    BuildCar(world, "Parked Car", new Vector3(x, 0f, -59.5f), 90f + R(-6f, 6f), M(cars[rng.Next(cars.Length)]));
+            }
+        }
+        foreach (var (x, z, yaw) in new[] { (-22f, -58f, 0f), (-10f, -60f, 180f), (12f, -58f, 0f), (24f, -60f, 180f) })
+            Shed(new Vector3(x, 0f, z), yaw);
+        foreach (float x in new[] { -30f, -4f, 18f, 30f })
+            Tree(new Vector3(x, 0f, -55.5f + R(-1f, 1f)), 2.8f);
+
+        // North strip: trees, hedges and sheds behind the north row.
+        for (float x = -80f; x <= 80f; x += 16f)
+            Tree(new Vector3(x + R(-3f, 3f), 0f, 79.5f + R(-1.5f, 1.5f)), R(2.6f, 3.4f));
+        foreach (var (x, yaw) in new[] { (-60f, 180f), (-20f, 0f), (28f, 180f), (64f, 0f) })
+            Shed(new Vector3(x, 0f, 79f), yaw);
+        for (float x = -74f; x < 74f; x += 20f)
+            Box(world, "Hedge", new Vector3(x + 6f, 0.6f, 67.2f), new Vector3(7f, 1.2f, 1f), M("Hedge"));
+
+        // Trees and street furniture along the ring road.
+        foreach (float z in new[] { -36f, -13f, 9f, 31f, 53f, 75f })
+        {
+            Tree(new Vector3(-67.5f, 0f, z), 2.8f);
+            Tree(new Vector3(67.5f, 0f, z - 6f), 2.8f);
+        }
+        foreach (var p in new[] { new Vector3(-77.6f, 0f, 30f), new Vector3(77.6f, 0f, -12f), new Vector3(-36f, 0f, -53.5f), new Vector3(36f, 0f, 68.6f) })
+            Cylinder(world, "TrashCan", p + Vector3.up * 0.5f, 0.32f, 1f, M("Metal"));
+        foreach (var p in new[] { new Vector3(-77.6f, 0f, -20f), new Vector3(77.6f, 0f, 46f) })
+            Cylinder(world, "Hydrant", p + Vector3.up * 0.4f, 0.15f, 0.8f, M("TruckRed"));
+        BuildCar(world, "Car", new Vector3(-72f, 0f, 30f), 4f, M("CarGreen"));
+        BuildCar(world, "Car", new Vector3(74f, 0f, -18f), 182f, M("CarCream"));
+        BuildCar(world, "Wrecked Car", new Vector3(20f, 0f, 72.5f), 87f, M("TruckRed"), wrecked: true);
+    }
+
+    /// <summary>Small garden shed with an open front: cover you can duck into.</summary>
+    static void Shed(Vector3 pos, float yaw)
+    {
+        var t = new GameObject("Shed").transform;
+        t.SetParent(world, false);
+        t.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
+        var wall = M("SidingWhite");
+        Box(t, "Floor", new Vector3(0f, 0.05f, 0f), new Vector3(4f, 0.1f, 3f), M("Floorboards"));
+        Box(t, "Back", new Vector3(0f, 1.25f, -1.4f), new Vector3(4f, 2.5f, 0.15f), wall);
+        Box(t, "Side", new Vector3(-1.93f, 1.25f, 0f), new Vector3(0.15f, 2.5f, 3f), wall);
+        Box(t, "Side", new Vector3(1.93f, 1.25f, 0f), new Vector3(0.15f, 2.5f, 3f), wall);
+        Box(t, "Front", new Vector3(-1.3f, 1.25f, 1.42f), new Vector3(1.4f, 2.5f, 0.15f), wall);
+        Box(t, "Roof", new Vector3(0f, 2.62f, 0f), new Vector3(4.4f, 0.2f, 3.4f), M("Roof"));
     }
 
     static void Tree(Vector3 pos, float crown)
