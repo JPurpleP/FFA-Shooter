@@ -81,6 +81,7 @@ public struct PlayerInput
 public class FpsPlayer : NetworkBehaviour
 {
     public const int MaxHealth = 100;
+    public const int KillHeal = 40; // health back for each kill
     public const float RespawnDelay = 4f;
     public const float BaseFov = 75f;
 
@@ -108,7 +109,9 @@ public class FpsPlayer : NetworkBehaviour
     // Killstreaks: kills since your last death, each reward lasting 30 s:
     // 3 = speed hack (double move speed), 5 = ESP, 8 = flyhack, 10 = aimbot.
     public const int SpeedStreak = 3, EspStreak = 5, FlyStreak = 8, AimbotStreak = 10;
-    public const float SpeedHackMultiplier = 2f, FlySpeed = 9f, FlyCeiling = 45f;
+    public const float SpeedHackMultiplier = 2f, FlyCeiling = 45f;
+    public const float FlySpeed = 13.5f;                // climb / sink speed while flying (1.5x the original 9 m/s)
+    public const float FlyHorizontalMultiplier = 2f;    // flying doubles horizontal speed (stacks with the speed hack)
     public const float StreakRewardSeconds = 30f;
     public readonly NetworkVariable<int> Streak = new();
     public readonly NetworkVariable<double> EspUntil = new();      // server time the ESP runs out
@@ -150,6 +153,8 @@ public class FpsPlayer : NetworkBehaviour
     public readonly NetworkVariable<byte> DuelSlot = new();
     /// <summary>Waiting in the pre-match lobby: out of the world, can't be hit (server written).</summary>
     public readonly NetworkVariable<bool> InLobby = new();
+    /// <summary>Kills to win this match (server written, mirrored on every player so clients can show it).</summary>
+    public readonly NetworkVariable<byte> MatchFragLimit = new();
     /// <summary>Readied up in the lobby (bots are always ready).</summary>
     public readonly NetworkVariable<bool> Ready = new(false,
         NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -327,7 +332,10 @@ public class FpsPlayer : NetworkBehaviour
         if (IsServer && botOnServer)
             IsBot.Value = true;
         if (IsServer)
+        {
             InLobby.Value = MatchRules.LobbyOpen;
+            MatchFragLimit.Value = (byte)MatchRules.FragLimit;
+        }
         InLobby.OnValueChanged += OnLobbyChanged;
         Protected.OnValueChanged += (_, on) => { if (on) protectStartedLocal = Time.time; };
         if (Protected.Value) protectStartedLocal = Time.time;
@@ -440,9 +448,9 @@ public class FpsPlayer : NetworkBehaviour
         }
         else if (alive)
         {
-            float sens = GameSettings.Sensitivity * (fov / GameSettings.Fov);
+            float sens = GameSettings.Sensitivity * (fov / GameSettings.Fov) * Mathf.Lerp(1f, GameSettings.AdsSensitivity, adsT);
             yaw += input.Look.x * sens;
-            pitch = Mathf.Clamp(pitch - input.Look.y * sens, -89f, 89f);
+            pitch = Mathf.Clamp(pitch + (GameSettings.InvertY ? 1f : -1f) * input.Look.y * sens, -89f, 89f);
         }
         aimbotLock = null;
         if (alive && AimbotActive)
@@ -488,6 +496,7 @@ public class FpsPlayer : NetworkBehaviour
             Vector3 move = transform.TransformDirection(Vector3.ClampMagnitude(new Vector3(input.Move.x, 0f, input.Move.y), 1f))
                            * (sprint ? sprintSpeed : walkSpeed) * speedScale;
             if (SpeedActive && !InDuel) move *= SpeedHackMultiplier; // speed hack (slides inherit the doubled speed)
+            if (Flying) move *= FlyHorizontalMultiplier;
             if (sliding)
                 move = slideDir * slideSpeed + move * 0.12f; // momentum carries you; a touch of steering
             UpdateGrapple(input, ref move);
@@ -571,29 +580,29 @@ public class FpsPlayer : NetworkBehaviour
             input.FireHeld = input.FirePressed = forceFireToggle;
         }
         if (!GameUI.CursorCaptured) return input;
-        var kb = Keyboard.current;
         var mouse = Mouse.current;
-        if (kb != null)
+        if (Keyboard.current != null)
         {
-            if (kb.wKey.isPressed) input.Move.y += 1f;
-            if (kb.sKey.isPressed) input.Move.y -= 1f;
-            if (kb.dKey.isPressed) input.Move.x += 1f;
-            if (kb.aKey.isPressed) input.Move.x -= 1f;
-            input.Sprint = kb.leftShiftKey.isPressed;
-            input.Jump = kb.spaceKey.wasPressedThisFrame;
-            input.JumpHeld = kb.spaceKey.isPressed;
-            input.Reload = kb.rKey.wasPressedThisFrame;
-            input.Interact = kb.fKey.wasPressedThisFrame;
-            input.Grapple = kb.gKey.wasPressedThisFrame;
-            input.CrouchDown = kb.leftCtrlKey.wasPressedThisFrame || kb.cKey.wasPressedThisFrame;
-            input.CrouchHeld = kb.leftCtrlKey.isPressed || kb.cKey.isPressed;
-            input.ProneToggle = kb.zKey.wasPressedThisFrame;
-            input.GrenadeHeld |= kb.tKey.isPressed;
-            if (kb.qKey.isPressed) input.Lean -= 1f;
-            if (kb.eKey.isPressed) input.Lean += 1f;
-            if (kb.digit1Key.wasPressedThisFrame) input.SwitchTo = 0;
-            if (kb.digit2Key.wasPressedThisFrame) input.SwitchTo = 1;
-            if (kb.digit3Key.wasPressedThisFrame) input.SwitchTo = 2;
+            // Rebindable keys (Options > Keybindings).
+            if (Bindings.Held(GameAction.Forward)) input.Move.y += 1f;
+            if (Bindings.Held(GameAction.Back)) input.Move.y -= 1f;
+            if (Bindings.Held(GameAction.Right)) input.Move.x += 1f;
+            if (Bindings.Held(GameAction.Left)) input.Move.x -= 1f;
+            input.Sprint = Bindings.Held(GameAction.Sprint);
+            input.Jump = Bindings.Pressed(GameAction.Jump);
+            input.JumpHeld = Bindings.Held(GameAction.Jump);
+            input.Reload = Bindings.Pressed(GameAction.Reload);
+            input.Interact = Bindings.Pressed(GameAction.Interact);
+            input.Grapple = Bindings.Pressed(GameAction.Grapple);
+            input.CrouchDown = Bindings.Pressed(GameAction.Crouch);
+            input.CrouchHeld = Bindings.Held(GameAction.Crouch);
+            input.ProneToggle = Bindings.Pressed(GameAction.Prone);
+            input.GrenadeHeld |= Bindings.Held(GameAction.Grenade);
+            if (Bindings.Held(GameAction.LeanLeft)) input.Lean -= 1f;
+            if (Bindings.Held(GameAction.LeanRight)) input.Lean += 1f;
+            if (Bindings.Pressed(GameAction.Slot1)) input.SwitchTo = 0;
+            if (Bindings.Pressed(GameAction.Slot2)) input.SwitchTo = 1;
+            if (Bindings.Pressed(GameAction.Slot3)) input.SwitchTo = 2;
         }
         if (mouse != null)
         {
@@ -1169,6 +1178,7 @@ public class FpsPlayer : NetworkBehaviour
         {
             attacker.Kills.Value++;
             attacker.ServerAddStreak();
+            if (!attacker.IsDead) attacker.Health.Value = Mathf.Min(MaxHealth, attacker.Health.Value + KillHeal); // a kill heals
         }
         // Losing a golden duel: your guns fall back on the map, where the duel began.
         Vector3 dropAt = DuelManager.OnDeath(this, out var duelDropAt) ? duelDropAt : transform.position;
@@ -1267,9 +1277,7 @@ public class FpsPlayer : NetworkBehaviour
         }
         Health.Value = MaxHealth;
         SnaredUntil.Value = 0;
-        Protected.Value = true;
-        protectEndsAt = Time.time + SpawnProtectSeconds;
-        protectStartedLocal = Time.time;
+        ServerProtect();
         Vector3 position;
         float spawnYaw;
         if (brain != null && brain.fixedSpawn.HasValue)
@@ -1465,7 +1473,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         if (!IsLocalHuman) return;
         if (reward == 3) GameUI.ShowBanner($"{SpeedStreak} KILL STREAK: SPEED HACK", "Double running, walking and sliding speed for 30 s", new Color(1f, 0.85f, 0.25f));
-        else if (reward == 4) GameUI.ShowBanner($"{FlyStreak} KILL STREAK: FLYHACK", "Fly for 30 s: Space to rise, Ctrl to sink", new Color(0.6f, 0.75f, 1f));
+        else if (reward == 4) GameUI.ShowBanner($"{FlyStreak} KILL STREAK: FLYHACK", $"Fly for 30 s: {Bindings.Label(GameAction.Jump)} to rise, {Bindings.Label(GameAction.Crouch)} to sink", new Color(0.6f, 0.75f, 1f));
         else if (reward == 1) GameUI.ShowBanner($"{EspStreak} KILL STREAK: ESP", "See every enemy through walls for 30 s", new Color(0.35f, 1f, 0.55f));
         else GameUI.ShowBanner($"{AimbotStreak} KILL STREAK: AIMBOT", "Your aim locks onto enemies in view for 30 s", new Color(1f, 0.3f, 0.25f));
         audioSource.PlayOneShot(Sfx.Bell, 0.6f);
@@ -1536,6 +1544,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         DuelSlot.Value = 0;
         Health.Value = MaxHealth;
+        if (won) ServerProtect();
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, newYaw, 0f));
         DuelTeleportRpc(position, newYaw);
         DuelResultRpc(won);
@@ -2213,6 +2222,14 @@ public class FpsPlayer : NetworkBehaviour
     {
         ApplyAliveState();
         if (IsLocalHuman && current < previous) GameUI.FlashDamage(previous - current);
+    }
+
+    /// <summary>Server: start the short spawn invulnerability (respawns, golden-duel winners).</summary>
+    void ServerProtect()
+    {
+        Protected.Value = true;
+        protectEndsAt = Time.time + SpawnProtectSeconds;
+        protectStartedLocal = Time.time;
     }
 
     // ------------------------------------------------------------------ rope snare

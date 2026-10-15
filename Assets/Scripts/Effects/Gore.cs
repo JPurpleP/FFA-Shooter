@@ -11,12 +11,15 @@ public static class Gore
     static readonly Queue<GameObject> holes = new();
     static readonly Queue<GameObject> gibs = new();
     static readonly Queue<GameObject> corpses = new();
-    const int MaxDecals = 650, MaxHoles = 150, MaxGibs = 520, MaxCorpses = 16;
+    const int MaxDecals = 650, MaxHoles = 150, MaxGibs = 220, MaxCorpses = 16;
+    const int GibsPerFrame = 25; // more than this in one frame are spread over the next frames (no hitch on obliterations)
+    static int gibFrame = -1, gibsThisFrame;
+    static bool obliterating; // while true, per-limb sprays are scaled down (the whole-body burst covers them)
 
     static readonly Color BloodA = new(0.55f, 0f, 0f, 1f);
     static readonly Color BloodB = new(0.25f, 0f, 0.01f, 1f);
 
-    public static float Multiplier = 2f; // blood/gib volume; the dev panel can crank this further
+    public static float Multiplier = 1f; // blood/gib volume (GameSettings sets it to half the gore setting)
 
     // ------------------------------------------------------------------ corpses
 
@@ -195,6 +198,13 @@ public static class Gore
     /// </summary>
     static void Obliterate(Transform[] parts, Rigidbody[] rbs, DeathInfo info, Vector3 dir, float impulse, System.Random rng)
     {
+        obliterating = true;
+        try { ObliterateBody(parts, rbs, info, dir, impulse, rng); }
+        finally { obliterating = false; }
+    }
+
+    static void ObliterateBody(Transform[] parts, Rigidbody[] rbs, DeathInfo info, Vector3 dir, float impulse, System.Random rng)
+    {
         float m = Multiplier;
         Vector3 chestPos = parts[(int)BodyModel.Part.Chest].position;
         Vector3 center = info.Explosive ? info.ExplosionCenter : chestPos - dir * 0.6f;
@@ -216,10 +226,10 @@ public static class Gore
         }
 
         // Meat shower, guts, red mist, falling blood and a ring of splatter.
-        Gibs(chestPos, Vector3.up * 4f, (int)(60 * m), 14f, rng, boneShare: 0.3f);
-        Guts(rbs[(int)BodyModel.Part.Pelvis], chestPos, 14, rng);
-        Guts(rbs[(int)BodyModel.Part.Chest], chestPos, 10, rng);
-        Burst(chestPos, Vector3.up, (int)(260 * m), 5f, 16f, 75f, 0.09f, true);
+        Gibs(chestPos, Vector3.up * 4f, (int)(36 * m), 14f, rng, boneShare: 0.3f);
+        Guts(rbs[(int)BodyModel.Part.Pelvis], chestPos, 10, rng);
+        Guts(rbs[(int)BodyModel.Part.Chest], chestPos, 8, rng);
+        Burst(chestPos, Vector3.up, (int)(180 * m), 5f, 16f, 75f, 0.09f, true);
         Mist(chestPos, 140);
         SplatterRing(chestPos, 28, 9f, 1.2f, rng);
         PlayAt(Sfx.Splatter, chestPos, 1f);
@@ -272,6 +282,7 @@ public static class Gore
 
     static void SplatterRing(Vector3 origin, int rays, float range, float size, System.Random rng)
     {
+        rays = Mathf.Max(4, Mathf.RoundToInt(rays * Multiplier * 0.5f));
         for (int i = 0; i < rays; i++)
         {
             float ang = (float)(i / (double)rays * System.Math.PI * 2.0 + rng.NextDouble() * 0.3);
@@ -284,6 +295,7 @@ public static class Gore
     /// <summary>Slow, lingering red cloud.</summary>
     public static void Mist(Vector3 pos, int count)
     {
+        count = Mathf.Max(4, Mathf.RoundToInt(count * Multiplier * 0.5f));
         var ps = NewSystem("BloodMist", pos, Quaternion.LookRotation(Vector3.up), GameAssets.I.bloodParticle, false);
         var main = ps.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.8f, 3.5f);
@@ -328,8 +340,9 @@ public static class Gore
         }
         Stump(t, Vector3.zero, Vector3.up);
         Fountain(t, Vector3.zero, Vector3.up, 3.5f, 35f, 0.8f);
-        Burst(jointPos, dir + Vector3.up * 0.3f, (int)(80 * Multiplier), 2f, 9f, 55f, 0.08f, true);
-        Gibs(jointPos, dir * 3f, (int)(8 * Multiplier), 5f, rng, boneShare: 0.25f);
+        float limb = obliterating ? 0.3f : 1f;
+        Burst(jointPos, dir + Vector3.up * 0.3f, (int)(80 * Multiplier * limb), 2f, 9f, 55f, 0.08f, true);
+        Gibs(jointPos, dir * 3f, (int)(8 * Multiplier * limb), 5f, rng, boneShare: 0.25f);
         SplatterRays(jointPos, dir, 4, 5f, 0.6f, rng);
 
         var rb = t.GetComponent<Rigidbody>();
@@ -458,6 +471,21 @@ public static class Gore
 
     public static void Gibs(Vector3 pos, Vector3 velocity, int count, float scatter, System.Random rng, float boneShare = 0.12f)
     {
+        if (count <= 0) return;
+        if (Time.frameCount != gibFrame) { gibFrame = Time.frameCount; gibsThisFrame = 0; }
+        int now = Mathf.Min(count, Mathf.Max(0, GibsPerFrame - gibsThisFrame));
+        gibsThisFrame += now;
+        if (count > now)
+        {
+            int rest = count - now;
+            var later = new System.Random(rng.Next());
+            GoreRunner.NextFrame(() => Gibs(pos, velocity, rest, scatter, later, boneShare));
+        }
+        SpawnGibs(pos, velocity, now, scatter, rng, boneShare);
+    }
+
+    static void SpawnGibs(Vector3 pos, Vector3 velocity, int count, float scatter, System.Random rng, float boneShare)
+    {
         var a = GameAssets.I;
         for (int i = 0; i < count; i++)
         {
@@ -477,7 +505,7 @@ public static class Gore
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             rb.linearVelocity = velocity + Random.insideUnitSphere * scatter + Vector3.up * scatter * 0.4f;
             rb.angularVelocity = Random.insideUnitSphere * 20f;
-            if (rng.NextDouble() < 0.6) AddTrail(go, 0.35f, s * 0.8f);
+            if (rng.NextDouble() < 0.25) AddTrail(go, 0.35f, s * 0.8f);
             go.AddComponent<Gib>();
             Object.Destroy(go, Random.Range(25f, 35f));
             Track(gibs, go, MaxGibs);
@@ -487,6 +515,7 @@ public static class Gore
     /// <summary>A dangling chain of intestine segments attached to a body.</summary>
     public static void Guts(Rigidbody anchor, Vector3 pos, int segments, System.Random rng)
     {
+        segments = Mathf.Clamp(Mathf.RoundToInt(segments * Multiplier * 0.5f), 3, segments);
         var a = GameAssets.I;
         Rigidbody prev = anchor;
         Vector3 p = pos;
@@ -539,6 +568,7 @@ public static class Gore
 
     static void SplatterRays(Vector3 origin, Vector3 dir, int rays, float range, float size, System.Random rng)
     {
+        rays = Mathf.Max(1, Mathf.RoundToInt(rays * Multiplier * 0.5f));
         for (int i = 0; i < rays; i++)
         {
             Vector3 d = (dir + new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.6f, (float)rng.NextDouble() - 0.5f) * 1.2f).normalized;

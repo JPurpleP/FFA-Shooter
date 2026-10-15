@@ -7,7 +7,7 @@ using UnityEngine;
 /// <summary>
 /// Server-side golden-gun duels. A hit from the Golden Deagle sends the shooter and the victim to a free
 /// DuelArena, both at full health, fists only. Whoever dies loses (weapons drop back where they stood on the
-/// map, normal respawn); the winner returns to exactly where they were when the shot landed, at full health.
+/// map, normal respawn); the winner returns at a random spawn point, at full health with spawn protection.
 /// After <see cref="SuddenDeathAfter"/> seconds both fighters start bleeding out so a duel always ends.
 /// Lives on the NetworkManager object.
 /// </summary>
@@ -93,7 +93,11 @@ public class DuelManager : MonoBehaviour
         if (!active.Contains(d)) yield break; // aborted meanwhile (new match, disconnect)
         active.Remove(d);
         if (winner != null && winner.IsSpawned && winner.InDuel)
-            winner.ServerExitDuel(winner == d.a ? d.aPos : d.bPos, winner == d.a ? d.aYaw : d.bYaw, true);
+        {
+            // The winner comes back at a random spawn point (not where the duel began), spawn-protected.
+            SpawnPoint.Pick(winner, out var pos, out var yaw);
+            winner.ServerExitDuel(pos, yaw, true);
+        }
     }
 
     /// <summary>Server: `p` left the game or is being respawned (new match). End their duel and send the other fighter home.</summary>

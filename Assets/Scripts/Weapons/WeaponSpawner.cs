@@ -31,6 +31,9 @@ public class WeaponSpawner : MonoBehaviour
     public float respawnDelay = 60f;
     public bool exclusive;
     public bool oncePerMatch; // spawns at the start of each match and never again until the next one
+    /// <summary>Random weapon spawners: after the first spawn, each respawn moves to a random free spot from this pool.</summary>
+    public PickupSpotPool pool;
+    bool spawnedOnce;
     bool usedThisMatch;
 
     WeaponPickup current;
@@ -75,6 +78,8 @@ public class WeaponSpawner : MonoBehaviour
     public void SpawnNow()
     {
         if (current != null && current.IsSpawned) return;
+        if (pool != null && spawnedOnce) transform.position = pool.PickFree() + Vector3.up * 0.03f;
+        spawnedOnce = true;
         var id = randomThrowable ? WeaponDefs.Throwables[Random.Range(0, WeaponDefs.Throwables.Length)]
             : randomWeapon ? RandomPool[Random.Range(0, RandomPool.Length)] : weapon;
         var def = WeaponDefs.Get(id);

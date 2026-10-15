@@ -12,7 +12,7 @@ public static partial class ProjectBuilder
     /// spots with room to stand, then pick them farthest-point first so they cover the whole map.
     /// </summary>
     static void PlaceWeaponSpawners(string map, int count, System.Func<Vector3, bool> reject = null)
-        => PlaceSpawners(map, count, reject, WeaponId.None, "Weapon Spawns", 60f);
+        => PlaceSpawners(map, count, reject, WeaponId.None, "Weapon Spawns", 30f);
 
     /// <summary>Grappling hook pickups on their own spots, filling the gaps between the weapon spawns.</summary>
     static void PlaceHookSpawners(string map, int count, System.Func<Vector3, bool> reject = null)
@@ -81,6 +81,14 @@ public static partial class ProjectBuilder
 
         var parent = new GameObject(groupName).transform;
         parent.SetParent(world, false);
+        // Gun spawners wander: every respawn picks a new spot from (a thinned-out set of) the walkable candidates.
+        PickupSpotPool pool = null;
+        if (fixedItem == WeaponId.None && candidates.Count > 0)
+        {
+            pool = parent.gameObject.AddComponent<PickupSpotPool>();
+            int step = Mathf.Max(1, candidates.Count / 900);
+            pool.spots = candidates.Where((_, i) => i % step == 0).ToArray();
+        }
         foreach (var p in chosen)
         {
             bool grenades = fixedItem == WeaponId.FragGrenade;
@@ -92,6 +100,7 @@ public static partial class ProjectBuilder
             s.randomThrowable = grenades;
             s.weapon = fixedItem == WeaponId.None ? WeaponId.M4A1 : fixedItem;
             s.respawnDelay = delay;
+            s.pool = pool;
         }
         Debug.Log($"[FFA] {groupName} ({map}): {chosen.Count} placed from {candidates.Count} candidates");
 

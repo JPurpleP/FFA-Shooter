@@ -173,6 +173,9 @@ public partial class GameUI : MonoBehaviour
         }
     }
 
+    /// <summary>The key currently bound to an action, for on-screen hints.</summary>
+    static string K(GameAction a) => Bindings.Label(a);
+
     static string ThrowShort(int type) => type switch { 0 => "Frag", 1 => "Smoke", 2 => "Rope", _ => "Molotov" };
 
     static void DrawLine(Vector2 a, Vector2 b, float width, Color color)
@@ -395,11 +398,15 @@ public partial class GameUI : MonoBehaviour
             SetCursorCaptured(false);
         wasInGame = inGame;
 
+        bool escUsed = UpdateRebind(); // Esc while waiting for a key cancels the rebind, nothing else
         if (inGame)
         {
             var kb = Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame && !DevPanel.Open)
-                SetCursorCaptured(Cursor.lockState != CursorLockMode.Locked);
+            if (kb != null && kb.escapeKey.wasPressedThisFrame && !DevPanel.Open && !escUsed)
+            {
+                if (pauseOptions && Cursor.lockState != CursorLockMode.Locked) pauseOptions = false; // back to the pause menu
+                else SetCursorCaptured(Cursor.lockState != CursorLockMode.Locked);
+            }
 
             if (local.IsDead && !wasDead)
                 deathTime = Time.time;
@@ -451,6 +458,7 @@ public partial class GameUI : MonoBehaviour
         else
             transport.SetConnectionData("127.0.0.1", p, "0.0.0.0");
         MatchRules.BeginSession(lobby);
+        if (lobby && !MatchRules.FragLimitFromCommandLine) MatchRules.SetFragLimit(GameSettings.FragLimit);
         status = Net.StartHost() ? "" : online ? "Could not start the online game." : $"Could not host on port {p} (already in use?)";
         if (status != "") RelayConnect.ClearCode();
         Debug.Log(online ? $"[FFA] Hosting online, join code {RelayConnect.Code}: {(status == "" ? "ok" : status)}"
@@ -674,7 +682,7 @@ public partial class GameUI : MonoBehaviour
                 Fill(new Rect(cx + 10, cy + 14, 6, 2), hc); Fill(new Rect(cx + 14, cy + 10, 2, 6), hc);
             }
             float cd = me.GrappleCooldownLeft;
-            string hook = me.IsGrappling ? "HOOKED · G/Space release" : cd > 0f ? $"HOOK {cd:0.0}s" : "[G] HOOK READY";
+            string hook = me.IsGrappling ? $"HOOKED · {K(GameAction.Grapple)}/{K(GameAction.Jump)} release" : cd > 0f ? $"HOOK {cd:0.0}s" : $"[{K(GameAction.Grapple)}] HOOK READY";
             Shadowed(new Rect(0, h - 120, w, 22), $"<size=13>{hook}</size>", centerLabel,
                 cd > 0f && !me.IsGrappling ? new Color(1f, 1f, 1f, 0.5f) : new Color(0.5f, 0.92f, 1f, 0.9f));
         }
@@ -709,7 +717,7 @@ public partial class GameUI : MonoBehaviour
         }
         if (me.FlyActive)
         {
-            Shadowed(new Rect(32, perkY, 300, 22), $"FLYHACK  {Mathf.CeilToInt(me.FlySecondsLeft)}s  <size=12>Space up · Ctrl down</size>", label, new Color(0.6f, 0.75f, 1f));
+            Shadowed(new Rect(32, perkY, 300, 22), $"FLYHACK  {Mathf.CeilToInt(me.FlySecondsLeft)}s  <size=12>{K(GameAction.Jump)} up · {K(GameAction.Crouch)} down</size>", label, new Color(0.6f, 0.75f, 1f));
             perkY -= 22;
         }
         if (me.EspActive)
@@ -767,7 +775,7 @@ public partial class GameUI : MonoBehaviour
         {
             // Slot 3: how many of the selected throwable are left.
             Shadowed(new Rect(w - 330, h - 75, 300, 50), $"{me.CurrentMag}", ammoStyle, Color.white);
-            Shadowed(new Rect(w - 530, h - 98, 500, 24), "<size=13>Hold LMB / T, release to throw  ·  3: next type</size>", right, new Color(1f, 1f, 1f, 0.7f));
+            Shadowed(new Rect(w - 530, h - 98, 500, 24), $"<size=13>Hold LMB / {K(GameAction.Grenade)}, release to throw  ·  {K(GameAction.Slot3)}: next type</size>", right, new Color(1f, 1f, 1f, 0.7f));
         }
         else if (def != null)
         {
@@ -779,7 +787,7 @@ public partial class GameUI : MonoBehaviour
             if (empty && me.CurrentReserve == 0)
                 Shadowed(new Rect(w - 330, h - 98, 300, 24), "NO AMMO", right, new Color(1f, 0.3f, 0.3f));
             else if (empty || (me.CurrentMag < def.MagSize / 4 && !me.IsReloading))
-                Shadowed(new Rect(w - 330, h - 98, 300, 24), "[R] RELOAD", right, new Color(1f, 0.8f, 0.3f));
+                Shadowed(new Rect(w - 330, h - 98, 300, 24), $"[{K(GameAction.Reload)}] RELOAD", right, new Color(1f, 0.8f, 0.3f));
         }
         for (int slot = 0; slot < 2; slot++)
         {
@@ -800,7 +808,7 @@ public partial class GameUI : MonoBehaviour
             parts.Add(tt == inv.Throwable ? $"<b>{nm} × {n}</b>" : $"<color=#ffffff88>{nm} × {n}</color>");
         }
         bool throwActive = inv.Active == Inventory.ThrowSlot;
-        string throwText = parts.Count > 0 ? $"[3] {string.Join("   ", parts)}  <size=12>[T] throw</size>" : "[3] —";
+        string throwText = parts.Count > 0 ? $"[{K(GameAction.Slot3)}] {string.Join("   ", parts)}  <size=12>[{K(GameAction.Grenade)}] throw</size>" : $"[{K(GameAction.Slot3)}] —";
         Shadowed(new Rect(w - 530, h - 126, 500, 24), throwText, right,
             throwActive ? Color.white : parts.Count > 0 ? new Color(0.8f, 0.9f, 0.7f, 0.8f) : new Color(1f, 1f, 1f, 0.35f));
         if (me.Snared)
@@ -811,13 +819,13 @@ public partial class GameUI : MonoBehaviour
         // Pickup prompt
         var pickup = me.NearbyPickup;
         if (pickup != null && pickup.Def != null && !me.IsDead && pickup.Id == WeaponId.GrappleHook)
-            Shadowed(new Rect(0, h / 2 + 60, w, 26), me.HasGrapple.Value ? "You already have a grappling hook" : "[F] Pick up Grappling Hook  <size=13>(G to fire)</size>", centerLabel, pickup.Def.PickupGlow);
+            Shadowed(new Rect(0, h / 2 + 60, w, 26), me.HasGrapple.Value ? "You already have a grappling hook" : $"[{K(GameAction.Interact)}] Pick up Grappling Hook  <size=13>({K(GameAction.Grapple)} to fire)</size>", centerLabel, pickup.Def.PickupGlow);
         else if (pickup != null && pickup.Def != null && !me.IsDead && pickup.Def.IsThrowable)
         {
             int pt = WeaponDefs.ThrowableIndex(pickup.Id);
             bool full = pt >= 0 && inv.ThrowCount(pt) >= WeaponDefs.MaxCarry[pt];
             string what = pickup.Mag.Value > 1 ? $"{pickup.Mag.Value} × {pickup.Def.Name}" : pickup.Def.Name;
-            Shadowed(new Rect(0, h / 2 + 60, w, 26), full ? $"{pickup.Def.Name}: carrying the most you can" : $"[F] Pick up {what}", centerLabel, pickup.Def.PickupGlow);
+            Shadowed(new Rect(0, h / 2 + 60, w, 26), full ? $"{pickup.Def.Name}: carrying the most you can" : $"[{K(GameAction.Interact)}] Pick up {what}", centerLabel, pickup.Def.PickupGlow);
         }
         else if (pickup != null && pickup.Def != null && !me.IsDead)
         {
@@ -825,7 +833,7 @@ public partial class GameUI : MonoBehaviour
             string verb = inv.SlotOf((int)pd.Id) >= 0 ? $"Take ammo for {pd.Name}"
                 : inv.EmptySlot >= 0 ? $"Pick up {pd.Name}"
                 : $"Swap {def?.Name} for {pd.Name}";
-            Shadowed(new Rect(0, h / 2 + 60, w, 26), $"[F] {verb}  <size=13>({pickup.Mag.Value} + {pickup.Reserve.Value})</size>", centerLabel, pd.PickupGlow);
+            Shadowed(new Rect(0, h / 2 + 60, w, 26), $"[{K(GameAction.Interact)}] {verb}  <size=13>({pickup.Mag.Value} + {pickup.Reserve.Value})</size>", centerLabel, pd.PickupGlow);
         }
 
         // Match status
@@ -874,7 +882,7 @@ public partial class GameUI : MonoBehaviour
         }
 
         var kb = Keyboard.current;
-        if ((kb != null && kb.tabKey.isPressed) || ForceScores || !string.IsNullOrEmpty(winner))
+        if (Bindings.Held(GameAction.Scoreboard) || ForceScores || !string.IsNullOrEmpty(winner))
             DrawScoreboard(w, h, players, me);
 
         if (CenterDot) // test flag: the exact screen centre, where every shot goes
@@ -977,12 +985,27 @@ public partial class GameUI : MonoBehaviour
     bool confirmLeave;
 
     /// <summary>Esc menu: resume, quick settings, join code, leave / quit (styled like the main menu).</summary>
+    bool pauseOptions; // the Esc menu is showing Options
+
     void DrawPauseMenu(float w, float h)
     {
         EnsureMenuStyles();
+        if (pauseOptions)
+        {
+            Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.55f));
+            float ow = Mathf.Min(w - 80, 760), oh = Mathf.Min(h - 60, 620);
+            var orect = new Rect((w - ow) / 2f, (h - oh) / 2f, ow, oh);
+            Fill(orect, new Color(0.04f, 0.05f, 0.07f, 0.96f));
+            Fill(new Rect(orect.x, orect.y, orect.width, 3), Accent);
+            var inner = new Rect(orect.x + 30, orect.y + 20, orect.width - 60, orect.height - 90);
+            DrawOptions(inner, "OPTIONS");
+            var back = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+            if (GUI.Button(new Rect(orect.x + 30, orect.yMax - 62, 180, 44), "BACK", back)) { pauseOptions = false; rebinding = -1; }
+            return;
+        }
         bool online = RelayConnect.Code != "";
         Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.45f));
-        float pw = 440, ph = online ? 484 : 430;
+        float pw = 440, ph = online ? 400 : 346;
         var r = new Rect((w - pw) / 2f, (h - ph) / 2f, pw, ph);
         Fill(r, new Color(0.04f, 0.05f, 0.07f, 0.94f));
         Fill(new Rect(r.x, r.y, r.width, 3), Accent);
@@ -1005,14 +1028,12 @@ public partial class GameUI : MonoBehaviour
             y += 54;
         }
 
-        // Quick settings (same values as the main menu's Settings tab).
-        var rr = new Rect(x, y, iw, 0);
-        bool changed = false;
-        CompactSlider(ref y, rr, "MOUSE SENSITIVITY", ref GameSettings.Sensitivity, 0.02f, 0.4f, v => (v * 10f).ToString("0.00"), ref changed);
-        CompactSlider(ref y, rr, "FIELD OF VIEW", ref GameSettings.Fov, 60f, 100f, v => $"{v:0}°", ref changed);
-        CompactSlider(ref y, rr, "MASTER VOLUME", ref GameSettings.Volume, 0f, 1f, v => $"{v * 100f:0}%", ref changed);
-        if (changed) GameSettings.Save();
-        y += 6;
+        if (GUI.Button(new Rect(x, y, iw, 46), "OPTIONS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        {
+            pauseOptions = true;
+            confirmLeave = false;
+        }
+        y += 58;
 
         float half = (iw - 12) / 2f;
         var secondary = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };

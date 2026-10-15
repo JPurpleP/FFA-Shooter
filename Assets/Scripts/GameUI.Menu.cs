@@ -93,7 +93,7 @@ public partial class GameUI
         if (GUI.Button(new Rect(48, y, 304, 52), "QUIT", navStyle)) QuitGame();
 
         GUI.Label(new Rect(50, h - 96, 330, 80),
-            "WASD move · Shift sprint · Space jump\nCtrl crouch / slide · Z prone · Q/E lean\nG hook · T grenade · F pick up · R reload\nTab scores · Esc menu" + (DevPanel.Enabled ? " · F1 dev panel" : ""),
+            "Esc menu > Options > Keybindings to change keys" + (DevPanel.Enabled ? " · F1 dev panel" : ""),
             new GUIStyle(smallStyle) { fontStyle = FontStyle.Normal, wordWrap = true });
 
         var panel = new Rect(450, 84, Mathf.Min(w - 500, 780), h - 160);
@@ -231,6 +231,22 @@ public partial class GameUI
             y += 30;
         }
 
+        // Score to win: the host sets it (10-100, steps of 5); everyone else sees it.
+        GUI.Label(new Rect(x, y, 200, 20), "SCORE TO WIN", smallStyle);
+        if (isHost)
+        {
+            float v = GUI.HorizontalSlider(new Rect(x + 130, y + 6, iw - 210, 20), MatchRules.FragLimit, MatchRules.MinFragLimit, MatchRules.MaxFragLimit);
+            int kills = Mathf.Clamp(Mathf.RoundToInt(v / 5f) * 5, MatchRules.MinFragLimit, MatchRules.MaxFragLimit);
+            if (kills != MatchRules.FragLimit)
+            {
+                MatchRules.SetFragLimit(kills);
+                GameSettings.FragLimit = kills;
+                GameSettings.Save();
+            }
+        }
+        GUI.Label(new Rect(x + iw - 70, y - 4, 70, 28), $"{MatchRules.FragLimit}", valueStyle);
+        y += 34;
+
         // Players.
         GUI.Label(new Rect(x, y, 300, 20), $"PLAYERS ({FpsPlayer.All.Count})", smallStyle);
         y += 26;
@@ -336,12 +352,103 @@ public partial class GameUI
 
     // ------------------------------------------------------------------ Settings
 
-    void DrawSettingsTab(Rect r)
+    void DrawSettingsTab(Rect r) => DrawOptions(r, "SETTINGS");
+
+    // ------------------------------------------------------------------ Options (main menu Settings and the Esc menu)
+
+    enum OptionsTab { General, Controls, Keybindings }
+    OptionsTab optionsTab;
+    int rebinding = -1; // index into Bindings.All while waiting for a key
+    Vector2 bindScroll;
+
+    void DrawOptions(Rect r, string title)
     {
-        GUI.Label(new Rect(r.x, r.y, r.width, 40), "SETTINGS", h2Style);
-        float y = r.y + 70;
+        GUI.Label(new Rect(r.x, r.y, 300, 40), title, h2Style);
+        // Tabs.
+        float tw = 150, tx = r.xMax - tw * 3 - 16;
+        foreach (OptionsTab t in System.Enum.GetValues(typeof(OptionsTab)))
+        {
+            if (GUI.Button(new Rect(tx, r.y + 4, tw, 34), t.ToString().ToUpper(), optionsTab == t ? mapButtonActiveStyle : mapButtonStyle) && optionsTab != t)
+            {
+                optionsTab = t;
+                rebinding = -1;
+            }
+            tx += tw + 8;
+        }
+        var body = new Rect(r.x, r.y + 60, r.width, r.height - 60);
+        switch (optionsTab)
+        {
+            case OptionsTab.General: DrawGeneralOptions(body); break;
+            case OptionsTab.Controls: DrawControlOptions(body); break;
+            case OptionsTab.Keybindings: DrawKeybindings(body); break;
+        }
+    }
+
+    void DrawControlOptions(Rect r)
+    {
+        float y = r.y + 4;
         bool changed = false;
         Slider(ref y, r, "MOUSE SENSITIVITY", ref GameSettings.Sensitivity, 0.02f, 0.4f, v => (v * 10f).ToString("0.00"), ref changed);
+        Slider(ref y, r, "AIM-DOWN-SIGHTS SENSITIVITY", ref GameSettings.AdsSensitivity, 0.2f, 1.5f, v => $"{v * 100f:0}%", ref changed);
+        GUI.Label(new Rect(r.x, y, 300, 20), "INVERT MOUSE Y", smallStyle);
+        if (GUI.Button(new Rect(r.x, y + 24, 120, 36), "OFF", GameSettings.InvertY ? mapButtonStyle : mapButtonActiveStyle) && GameSettings.InvertY)
+        { GameSettings.InvertY = false; changed = true; }
+        if (GUI.Button(new Rect(r.x + 128, y + 24, 120, 36), "ON", GameSettings.InvertY ? mapButtonActiveStyle : mapButtonStyle) && !GameSettings.InvertY)
+        { GameSettings.InvertY = true; changed = true; }
+        y += 80;
+        GUI.Label(new Rect(r.x, y, r.width, 44), "Mouse: left click fire · right click aim · middle click hook · wheel switches slots. Keys are in KEYBINDINGS.", bodyStyle);
+        if (changed) GameSettings.Save();
+    }
+
+    void DrawKeybindings(Rect r)
+    {
+        var rowName = new GUIStyle(bodyStyle) { fontSize = 15, alignment = TextAnchor.MiddleLeft, wordWrap = false };
+        var keyStyle = new GUIStyle(mapButtonStyle) { fontSize = 14 };
+        float rowH = 38, listH = r.height - 60;
+        var view = new Rect(r.x, r.y, r.width, listH);
+        var content = new Rect(0, 0, r.width - 20, Bindings.All.Length * rowH);
+        bindScroll = GUI.BeginScrollView(view, bindScroll, content, false, content.height > view.height);
+        for (int i = 0; i < Bindings.All.Length; i++)
+        {
+            var a = Bindings.All[i];
+            float y = i * rowH;
+            if (i % 2 == 0) Fill(new Rect(0, y, content.width, rowH - 2), new Color(1f, 1f, 1f, 0.03f));
+            GUI.Label(new Rect(12, y, content.width - 200, rowH - 2), Bindings.Name(a), rowName);
+            bool waiting = rebinding == i;
+            if (GUI.Button(new Rect(content.width - 180, y + 3, 170, rowH - 8), waiting ? "PRESS A KEY…" : Bindings.Label(a), waiting ? mapButtonActiveStyle : keyStyle))
+                rebinding = waiting ? -1 : i;
+        }
+        GUI.EndScrollView();
+        float by = r.yMax - 46;
+        GUI.Label(new Rect(r.x, by, r.width - 230, 40), rebinding >= 0 ? "Press the new key (Esc cancels). A key already in use swaps over." : "Click a key to change it.", smallStyle);
+        if (GUI.Button(new Rect(r.xMax - 210, by, 210, 40), "RESET KEYS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 15 }))
+        {
+            Bindings.ResetDefaults();
+            rebinding = -1;
+        }
+    }
+
+    /// <summary>Waiting for a key to bind? Returns true if Esc was used up (cancelling).</summary>
+    bool UpdateRebind()
+    {
+        if (rebinding < 0) return false;
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb == null) return false;
+        if (kb.escapeKey.wasPressedThisFrame) { rebinding = -1; return true; }
+        foreach (var k in kb.allKeys)
+            if (k != null && k.wasPressedThisFrame)
+            {
+                Bindings.Rebind(Bindings.All[rebinding], k.keyCode);
+                rebinding = -1;
+                break;
+            }
+        return false;
+    }
+
+    void DrawGeneralOptions(Rect r)
+    {
+        float y = r.y + 4;
+        bool changed = false;
         Slider(ref y, r, "FIELD OF VIEW", ref GameSettings.Fov, 60f, 100f, v => $"{v:0}°", ref changed);
         Slider(ref y, r, "MASTER VOLUME", ref GameSettings.Volume, 0f, 1f, v => $"{v * 100f:0}%", ref changed);
         Slider(ref y, r, "GORE LEVEL", ref GameSettings.GoreLevel, 0.5f, 4f, v => $"{v:0.0}x", ref changed);
@@ -360,16 +467,16 @@ public partial class GameUI
         { GameSettings.VSync = false; changed = true; }
         y += 76;
         if (changed) GameSettings.Save();
-        if (GUI.Button(new Rect(r.x, y + 10, 300, 46), "RESET TO DEFAULTS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        if (GUI.Button(new Rect(r.x, y + 4, 300, 44), "RESET TO DEFAULTS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
             GameSettings.ResetToDefaults();
     }
 
     void Slider(ref float y, Rect r, string label, ref float value, float min, float max, System.Func<float, string> fmt, ref bool changed)
     {
         GUI.Label(new Rect(r.x, y, 300, 20), label, smallStyle);
-        float v = GUI.HorizontalSlider(new Rect(r.x, y + 30, r.width - 120, 20), value, min, max);
-        GUI.Label(new Rect(r.x + r.width - 110, y + 18, 110, 34), fmt(v), valueStyle);
+        float v = GUI.HorizontalSlider(new Rect(r.x, y + 28, r.width - 120, 20), value, min, max);
+        GUI.Label(new Rect(r.x + r.width - 110, y + 16, 110, 34), fmt(v), valueStyle);
         if (!Mathf.Approximately(v, value)) { value = v; changed = true; }
-        y += 76;
+        y += 64;
     }
 }

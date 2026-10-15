@@ -17,7 +17,28 @@ public class MatchRules : MonoBehaviour
 
     /// <summary>True while the winner banner is showing (server only).</summary>
     public static bool IsMatchOver { get; private set; }
-    public static int FragLimit => instance != null ? instance.fragLimit : 25;
+    public const int MinFragLimit = 10, MaxFragLimit = 100, DefaultFragLimit = 25;
+    /// <summary>Kills to win. The server's value; clients read it off the player objects (FpsPlayer.MatchFragLimit).</summary>
+    public static int FragLimit
+    {
+        get
+        {
+            var net = Unity.Netcode.NetworkManager.Singleton;
+            if (net != null && net.IsListening && !net.IsServer)
+                foreach (var p in FpsPlayer.All)
+                    if (p.IsSpawned && p.MatchFragLimit.Value > 0) return p.MatchFragLimit.Value;
+            return instance != null ? instance.fragLimit : DefaultFragLimit;
+        }
+    }
+
+    /// <summary>Server: the host picked the score to win (lobby slider); everyone's display follows.</summary>
+    public static void SetFragLimit(int kills)
+    {
+        if (instance == null) return;
+        instance.fragLimit = Mathf.Clamp(kills, 1, MaxFragLimit);
+        foreach (var p in FpsPlayer.All)
+            if (p.IsSpawned && p.IsServer) p.MatchFragLimit.Value = (byte)instance.fragLimit;
+    }
     /// <summary>This session uses the waiting lobby (server only).</summary>
     public static bool UseLobby { get; private set; }
     /// <summary>Players are waiting in the lobby; new arrivals join it instead of the match (server only).</summary>
@@ -63,9 +84,11 @@ public class MatchRules : MonoBehaviour
     void Awake() => instance = this;
 
     /// <summary>-ffafraglimit &lt;n&gt;: shorter matches for tests.</summary>
+    public static bool FragLimitFromCommandLine { get; private set; }
     public static void OverrideFragLimit(int kills)
     {
-        if (instance != null) instance.fragLimit = Mathf.Max(1, kills);
+        FragLimitFromCommandLine = true;
+        SetFragLimit(kills);
     }
 
     public static void OnPlayerKilled(FpsPlayer killer, FpsPlayer victim, DeathInfo info)
