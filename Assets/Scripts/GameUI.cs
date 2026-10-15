@@ -35,7 +35,8 @@ public partial class GameUI : MonoBehaviour
     public static bool ForceFire { get; private set; } // -ffafire: hold the trigger (effects screenshots)
     public static bool ForceThrow { get; private set; } // -ffathrow: cook and throw a grenade (tests)
     public static bool CenterDot { get; private set; }  // -ffacenterdot: mark the exact screen centre (sight alignment checks)
-    static bool autoReady, autoStart, forcePause; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
+    static bool autoReady, autoStart, forcePause;
+    static int lobbyMapTest = -1; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
     static GameUI instance;
@@ -329,6 +330,7 @@ public partial class GameUI : MonoBehaviour
         autoReady = args.Contains("-ffaready");
         autoStart = args.Contains("-ffastartwhenready");
         forcePause = args.Contains("-ffapause");
+        if (int.TryParse(Arg("-ffalobbymap"), out int lm)) lobbyMapTest = lm; // host switches to this map once someone joins (tests)
         if (int.TryParse(Arg("-ffafraglimit"), out int fragLimit)) MatchRules.OverrideFragLimit(fragLimit);
         if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 2); // screenshot tests
         if (int.TryParse(Arg("-ffaskin"), out int sk)) GameSettings.Skin = Mathf.Clamp(sk, 0, Skins.Count - 1);
@@ -388,7 +390,12 @@ public partial class GameUI : MonoBehaviour
         if (local != null && local.InLobby.Value)
         {
             if (autoReady && !Net.IsServer && !local.Ready.Value) local.Ready.Value = true;
-            if (autoStart && Net.IsServer && MatchRules.LobbyOpen && FpsPlayer.All.Count >= 2 && MatchRules.EveryoneReady(out _))
+            if (lobbyMapTest >= 0 && Net.IsServer && MatchRules.LobbyOpen && FpsPlayer.All.Count >= 2)
+            {
+                MatchRules.SetMap(lobbyMapTest);
+                lobbyMapTest = -1;
+            }
+            if (autoStart && Net.IsServer && MatchRules.LobbyOpen && FpsPlayer.All.Count >= 2 && MatchRules.EveryoneReady(out _) && lobbyMapTest < 0)
                 MatchRules.StartMatch();
         }
 

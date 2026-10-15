@@ -24,7 +24,7 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   with a copy button, the HUD corner and the Tab leaderboard), friends type it into Join. No port forwarding, no IP
   addresses shared. There is no LAN / direct-IP option in the menu (direct connections remain only as command-line test flags).
 - **Lobby.** Hosting or joining puts you in a waiting lobby (player list, join code). Everyone presses **Ready Up**; the
-  host's **Start Match** unlocks once every player is ready. No bots in normal games (the F1 dev panel can still add them).
+  host's **Start Match** unlocks once every player is ready. The host can also switch the map in the lobby (everyone follows). No bots in normal games (the F1 dev panel can still add them).
   Players who join mid-match drop straight in.
 - **Spawn protection:** for 3 s after spawning you can't be hurt (and can't be pulled into a golden duel). Moving, jumping,
   firing, hooking or throwing ends it early. A "PROTECTED" tag shows over protected enemies in your line of sight.
@@ -86,7 +86,7 @@ rounds and 12 gauge kick hard (the biggest also jolt the view).
 
 **Pickups are completely random.** Every map has ~32 spawn spots spread evenly over ground you can walk to (streets,
 yards, ground floors, trails — not roofs), picked automatically when the map is built. Each roll is any weapon from the
-table (not the Glock); every weapon has an equal share except the golden Deagle, which has a double share. About 66 gun spawners per map; each respawns 30 s after being taken, at a new random spot on the map with a new roll.
+table (not the Glock); every weapon has an equal share except the golden Deagle, which has a double share. 50 gun spawners per map; each respawns 30 s after being taken, at a new random spot on the map with a new roll.
 
 **Golden duel.** Hit someone with the golden Deagle and you're both pulled into a boxing ring in an underground fight
 club, at full health, fists only (LMB punches, hold to keep swinging; head punches hit harder). Fight to the death: after

@@ -306,6 +306,13 @@ public class FpsPlayer : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         if (!IsServer) MapCatalog.Apply(MapId.Value);
+        // The host can switch maps in the lobby: follow it.
+        MapId.OnValueChanged += (_, map) =>
+        {
+            if (IsServer || map == MapCatalog.Current) return;
+            MapCatalog.Apply(map);
+            Gore.ClearAll();
+        };
         All.Add(this);
         Health.OnValueChanged += OnHealthChanged;
         netPosition.OnValueChanged += (_, _) => { hasNetPosition = true; PushSnap(); };

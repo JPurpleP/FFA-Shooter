@@ -989,7 +989,7 @@ public static partial class ProjectBuilder
         // Every map is built into this scene under its own root; MapCatalog switches between them at runtime.
         passages.Clear();
         BuildNuketown();
-        PlaceWeaponSpawners("Fluketown", 68);
+        PlaceWeaponSpawners("Fluketown", 50);
         PlaceHookSpawners("Fluketown", 8);
         PlaceGrenadeSpawners("Fluketown", 16);
         var fluketown = world.gameObject;
@@ -999,7 +999,7 @@ public static partial class ProjectBuilder
 
         passages.Clear();
         BuildCampground();
-        PlaceWeaponSpawners("Timberline", 64, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
+        PlaceWeaponSpawners("Timberline", 50, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         PlaceHookSpawners("Timberline", 8, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         PlaceGrenadeSpawners("Timberline", 16, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         var camp = world.gameObject;
@@ -1009,7 +1009,7 @@ public static partial class ProjectBuilder
 
         passages.Clear();
         BuildCity();
-        PlaceWeaponSpawners("Downtown", 68);
+        PlaceWeaponSpawners("Downtown", 50);
         PlaceHookSpawners("Downtown", 8);
         PlaceGrenadeSpawners("Downtown", 16);
         var city = world.gameObject;

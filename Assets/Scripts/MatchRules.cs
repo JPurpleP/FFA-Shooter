@@ -72,6 +72,24 @@ public class MatchRules : MonoBehaviour
         Debug.Log("[FFA] Match started");
     }
 
+    /// <summary>
+    /// Server, lobby only: the host picked another map. Pickups left on the old map go away, every player object
+    /// carries the new map id (clients switch when it changes), and the new map's spawners start up by themselves.
+    /// </summary>
+    public static void SetMap(int id)
+    {
+        if (!LobbyOpen) return;
+        id = Mathf.Clamp(id, 0, MapCatalog.Count - 1);
+        if (id == MapCatalog.Current) return;
+        foreach (var p in WeaponPickup.All.ToArray())
+            if (p != null && p.IsSpawned) p.Despawn();
+        MapCatalog.Apply(id);
+        Gore.ClearAll();
+        foreach (var pl in FpsPlayer.All)
+            if (pl.IsSpawned) pl.MapId.Value = (byte)id;
+        Debug.Log($"[FFA] Lobby map: {MapCatalog.NameOf(id)}");
+    }
+
     /// <summary>Can the host start? Every human other than the host has readied up.</summary>
     public static bool EveryoneReady(out int waiting)
     {

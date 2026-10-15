@@ -247,6 +247,22 @@ public partial class GameUI
         GUI.Label(new Rect(x + iw - 70, y - 4, 70, 28), $"{MatchRules.FragLimit}", valueStyle);
         y += 34;
 
+        // Map: the host can switch it here (everyone in the lobby follows).
+        if (isHost)
+        {
+            GUI.Label(new Rect(x, y + 10, 120, 20), "MAP", smallStyle);
+            float mw = (iw - 130 - 8 * (MapCatalog.Count - 1)) / MapCatalog.Count;
+            for (int i = 0; i < MapCatalog.Count; i++)
+                if (GUI.Button(new Rect(x + 130 + i * (mw + 8), y + 2, mw, 34), MapCatalog.NameOf(i).ToUpper(),
+                        MapCatalog.Current == i ? mapButtonActiveStyle : mapButtonStyle) && MapCatalog.Current != i)
+                {
+                    MatchRules.SetMap(i);
+                    GameSettings.Map = i;
+                    GameSettings.Save();
+                }
+            y += 46;
+        }
+
         // Players.
         GUI.Label(new Rect(x, y, 300, 20), $"PLAYERS ({FpsPlayer.All.Count})", smallStyle);
         y += 26;
