@@ -129,9 +129,10 @@ public class FpsPlayer : NetworkBehaviour
     // Spawn protection: can't be hurt for a few seconds after spawning, until you move or fire.
     public const float SpawnProtectSeconds = 3f;
     public readonly NetworkVariable<bool> Protected = new(); // server written; off when it runs out or is broken
-    // Rope grenade: tied in place (can still look and shoot) until this server time.
+    // Rope grenade: tethered to where it went off until this server time (free to move inside the rope's reach).
     public readonly NetworkVariable<double> SnaredUntil = new();
     public readonly NetworkVariable<Vector3> SnareAnchor = new();
+    public readonly NetworkVariable<float> SnareStartDistance = new(); // how far out they were when caught
     public bool Snared => IsSpawned && !IsDead && ServerNow < SnaredUntil.Value;
     public float SnareSecondsLeft => Snared ? (float)(SnaredUntil.Value - ServerNow) : 0f;
     public bool SpawnProtected => IsSpawned && !IsDead && Protected.Value;
@@ -469,12 +470,9 @@ public class FpsPlayer : NetworkBehaviour
         {
             if (Snared)
             {
-                // Roped in place: no moving, jumping, hooking or changing stance (looking and shooting still work).
-                input.Move = Vector2.zero;
-                input.Jump = input.JumpHeld = input.CrouchDown = input.CrouchHeld = input.ProneToggle = input.Grapple = false;
-                if (sliding) EndSlide(false);
+                // Tethered: move freely inside the rope's reach (enforced after the move below), but no hooking out of it.
+                input.Grapple = false;
                 if (grappling) ReleaseGrapple(false);
-                momentum = Vector3.zero;
             }
             if (Flying)
             {
@@ -521,6 +519,7 @@ public class FpsPlayer : NetworkBehaviour
                 momentum = Vector3.MoveTowards(momentum, Vector3.zero, (controller.isGrounded ? 30f : 2.5f) * Time.deltaTime);
             }
             var flags = controller.Move((move + momentum + Vector3.up * verticalVelocity) * Time.deltaTime);
+            if (Snared) EnforceTether();
             bool groundedNow = controller.isGrounded;
             if (groundedNow && !wasGroundedOwner && airVerticalSpeed < -4f)
             {
@@ -2221,6 +2220,7 @@ public class FpsPlayer : NetworkBehaviour
     public void ServerSnare(Vector3 anchor, float seconds)
     {
         SnareAnchor.Value = anchor;
+        SnareStartDistance.Value = Vector3.Distance(anchor, ChestPoint);
         SnaredUntil.Value = ServerNow + seconds;
         SnaredRpc();
     }
@@ -2229,7 +2229,27 @@ public class FpsPlayer : NetworkBehaviour
     void SnaredRpc()
     {
         momentum = Vector3.zero;
-        if (IsLocalHuman) GameUI.ShowBanner("SNARED!", "Roped in place for 10 s. You can still aim and shoot.", new Color(0.95f, 0.7f, 0.35f));
+        if (IsLocalHuman) GameUI.ShowBanner("SNARED!", "Tied to the rope grenade for 10 s: move freely, but you can't get any farther from it.", new Color(0.95f, 0.7f, 0.35f));
+    }
+
+    /// <summary>Rope length: how far from the grenade they were when it caught them. They can roam anywhere inside it.</summary>
+    public float TetherReach => Mathf.Max(WeaponDefs.MinTether, SnareStartDistance.Value);
+
+    /// <summary>Owner: the rope stops you at its reach (you're held at the edge and lose any outward speed).</summary>
+    void EnforceTether()
+    {
+        Vector3 anchor = SnareAnchor.Value;
+        Vector3 waist = transform.position + Vector3.up * controller.height * 0.5f;
+        Vector3 off = waist - anchor;
+        float dist = off.magnitude, reach = TetherReach;
+        if (dist <= reach || dist < 0.01f) return;
+        Vector3 dir = off / dist;
+        controller.Move(-dir * (dist - reach));
+        // Kill any speed carrying you further out (swings, blast pushes, slides, rising while flying).
+        float outward = Vector3.Dot(momentum, dir);
+        if (outward > 0f) momentum -= dir * outward;
+        if (sliding && Vector3.Dot(slideDir, dir) > 0.3f) EndSlide(false);
+        if (verticalVelocity > 0f && dir.y > 0.5f) verticalVelocity = 0f;
     }
 
     static Material ropeMaterial;
@@ -2262,29 +2282,32 @@ public class FpsPlayer : NetworkBehaviour
         }
         Vector3 anchor = SnareAnchor.Value, root = transform.position;
         float h = controller != null ? controller.height : 1.8f;
-        // Three sagging ropes from the grenade to the waist.
+        // Two ropes from the grenade to the waist: slack when you're close, pulled straight at full reach.
+        float slack = 1f - Mathf.Clamp01(Vector3.Distance(anchor, root + Vector3.up * h * 0.5f) / Mathf.Max(0.5f, TetherReach));
         for (int i = 0; i < 3; i++)
         {
             var l = snareLines[i];
-            l.enabled = true;
-            Vector3 side = transform.right * ((i - 1) * 0.18f);
-            Vector3 end = root + Vector3.up * h * (0.45f + i * 0.06f) + side;
-            const int n = 10;
+            l.enabled = i < 2;
+            if (!l.enabled) continue;
+            Vector3 side = transform.right * ((i - 0.5f) * 0.14f);
+            Vector3 end = root + Vector3.up * h * 0.5f + side;
+            const int n = 12;
             l.positionCount = n;
             for (int k = 0; k < n; k++)
             {
                 float t = k / (n - 1f);
                 Vector3 p = Vector3.Lerp(anchor + Vector3.up * 0.1f, end, t);
-                p.y -= Mathf.Sin(t * Mathf.PI) * 0.35f; // sag
+                p.y -= Mathf.Sin(t * Mathf.PI) * (0.08f + 1.2f * slack); // sag
                 l.SetPosition(k, p);
             }
         }
-        // Loops around the waist and the knees.
-        for (int i = 3; i < 5; i++)
+        // A loop around the waist (the knees are free now).
+        snareLines[4].enabled = false;
+        for (int i = 3; i < 4; i++)
         {
             var l = snareLines[i];
             l.enabled = true;
-            float y = h * (i == 3 ? 0.52f : 0.25f);
+            float y = h * 0.52f;
             const int n = 14;
             l.positionCount = n;
             for (int k = 0; k < n; k++)

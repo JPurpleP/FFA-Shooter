@@ -116,6 +116,7 @@ public static class WeaponDefs
     public static int ThrowableIndex(WeaponId id) => System.Array.IndexOf(Throwables, id);
     public const float SmokeFuse = 1.6f, SmokeSeconds = 16f, SmokeRadius = 5.5f;
     public const float RopeFuse = 1.3f, RopeRadius = 15f, SnareSeconds = 10f;
+    public const float MinTether = 1.5f; // snared players are leashed at the distance they were caught (never shorter than this)
     public const float MolotovMaxFlight = 6f, FireRadius = 3.6f, FireSeconds = 8f, FireDps = 24f;
 
     public static readonly WeaponDef[] All =

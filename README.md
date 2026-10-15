@@ -67,7 +67,7 @@ aim / hunting you through walls / speed; bots don't fly).
 | RPG-7 | 1 (+3) | fast rocket, big blast, backblast |
 | Frag grenade | start with 2, max 4 | slot 3; cook while held (3.2 s fuse), release to throw; bounces |
 | Smoke grenade | max 2 | slot 3; a thick cloud for ~16 s that also blinds bots and the aimbot |
-| Rope grenade | max 2 | slot 3; after 1.3 s it snares everyone in sight within 15 m: roped in place for 10 s (can still aim and shoot) |
+| Rope grenade | max 2 | slot 3; after 1.3 s it tethers everyone in sight within 15 m to where it landed for 10 s: they move freely but can't get any farther from it than they were |
 | Molotov | max 2 | slot 3; shatters on impact into a 3.6 m pool of fire for 8 s (24 damage/s, credited to the thrower) |
 | M1911 | 7 (+21) | .45 ACP, tall sights |
 | Glock (switch) | 33 (+66) | full-auto, held sideways one-handed (sights still line up) |

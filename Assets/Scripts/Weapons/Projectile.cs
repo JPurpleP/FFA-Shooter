@@ -298,6 +298,12 @@ public class Projectile : NetworkBehaviour
         if (visual != null) visual.gameObject.SetActive(false);
         Gore.PlayAt(Sfx.GrappleFire, at, 1f);
         Gore.PlayAt(Sfx.Swing, at, 1f);
+        // The spent grenade stays planted as the anchor the ropes are tied to.
+        var stake = new GameObject("RopeAnchor").transform;
+        Vector3 ground = Physics.Raycast(at + Vector3.up * 0.3f, Vector3.down, out var g, 3f, 1, QueryTriggerInteraction.Ignore) ? g.point : at;
+        stake.position = ground;
+        WeaponModel.Build(WeaponId.RopeGrenade, stake).transform.localScale = Vector3.one * 2.2f;
+        Destroy(stake.gameObject, WeaponDefs.SnareSeconds);
     }
 
     [Rpc(SendTo.ClientsAndHost)]
