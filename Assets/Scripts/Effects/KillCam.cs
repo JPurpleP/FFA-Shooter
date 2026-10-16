@@ -21,6 +21,7 @@ public class KillCam : MonoBehaviour
         public float yaw, pitch;
         public Quaternion eyeRot;
         public Stance stance;
+        public float ads;
     }
 
     static KillCam instance;
@@ -39,6 +40,12 @@ public class KillCam : MonoBehaviour
     public static Color KillerColor { get; private set; } = Color.white;
     /// <summary>0..1 through the replay.</summary>
     public static float Progress { get; private set; }
+    /// <summary>The replay is the match-winning kill (everyone watches it).</summary>
+    public static bool IsFinal { get; private set; }
+    /// <summary>The killer is looking through a scope in the replay right now (the HUD draws the scope).</summary>
+    public static bool Scoped { get; private set; }
+    /// <summary>0..1: how far down the sights the killer is in the replay.</summary>
+    public static float AdsAmount { get; private set; }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Create()
@@ -63,7 +70,7 @@ public class KillCam : MonoBehaviour
             {
                 t = t, root = p.transform.position, yaw = p.transform.eulerAngles.y,
                 pitch = -Mathf.Asin(Mathf.Clamp(p.Head.forward.y, -1f, 1f)) * Mathf.Rad2Deg,
-                eye = p.Head.position, eyeRot = p.Head.rotation, stance = p.CurrentStance,
+                eye = p.Head.position, eyeRot = p.Head.rotation, stance = p.CurrentStance, ads = p.AimAmount,
             });
             int drop = 0;
             while (drop < list.Count && list[drop].t < now - Keep) drop++;
@@ -89,7 +96,7 @@ public class KillCam : MonoBehaviour
             {
                 t = t, root = Vector3.Lerp(a.root, b.root, f), eye = Vector3.Lerp(a.eye, b.eye, f),
                 yaw = Mathf.LerpAngle(a.yaw, b.yaw, f), pitch = Mathf.Lerp(a.pitch, b.pitch, f),
-                eyeRot = Quaternion.Slerp(a.eyeRot, b.eyeRot, f), stance = f < 0.5f ? a.stance : b.stance,
+                eyeRot = Quaternion.Slerp(a.eyeRot, b.eyeRot, f), stance = f < 0.5f ? a.stance : b.stance, ads = Mathf.Lerp(a.ads, b.ads, f),
             };
             return true;
         }
@@ -99,11 +106,22 @@ public class KillCam : MonoBehaviour
 
     // ------------------------------------------------------------------ playback
 
+    /// <summary>The match-winning kill: everyone watches it through the winner's eyes.</summary>
+    public static void PlayFinal(FpsPlayer killer, FpsPlayer victim, WeaponId weapon, Transform corpse)
+    {
+        if (instance == null || victim == null || killer == null || killer == victim) return;
+        instance.Stop();
+        IsFinal = true;
+        instance.playing = instance.StartCoroutine(instance.Run(victim, killer, weapon, corpse, Time.time));
+    }
+
     /// <summary>The local player was just killed by `killer` (call on the victim's client).</summary>
     public static void Play(FpsPlayer victim, FpsPlayer killer, WeaponId weapon, Transform corpse)
     {
         if (instance == null || victim == null || killer == null || killer == victim) return;
+        if (IsFinal && Active) return; // the final kill replay takes priority
         instance.Stop();
+        IsFinal = false;
         instance.playing = instance.StartCoroutine(instance.Run(victim, killer, weapon, corpse, Time.time));
     }
 
@@ -118,6 +136,9 @@ public class KillCam : MonoBehaviour
         playing = null;
         Active = false;
         Progress = 0f;
+        IsFinal = false;
+        Scoped = false;
+        AdsAmount = 0f;
         if (hiddenKiller != null) hiddenKiller.SetHiddenForKillcam(false);
         if (hiddenCorpse != null) hiddenCorpse.gameObject.SetActive(true);
         if (ghostRoot != null) Destroy(ghostRoot);
@@ -152,9 +173,11 @@ public class KillCam : MonoBehaviour
         cam.cullingMask &= ~(1 << GameAssets.ViewModelLayer);
         cam.fieldOfView = GameSettings.Fov;
         cam.nearClipPlane = 0.03f;
+        Transform gunT = null;
         if (def != null && weapon != WeaponId.Fists && weapon != WeaponId.Melee)
         {
             var gun = WeaponModel.Build(weapon, cam.transform);
+            gunT = gun.transform;
             gun.transform.localPosition = def.HipOffset;
             foreach (var r in gun.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -175,15 +198,28 @@ public class KillCam : MonoBehaviour
         hiddenKiller = killer;
 
         Active = true;
-        float playhead = from;
+        float playhead = from, ads = 0f;
         while (playhead < to)
         {
-            if (victim == null || !victim.IsDead) break; // respawned: cut back to the game
+            if (victim == null || (!victim.IsDead && !IsFinal)) break; // respawned: cut back to the game
             if (killer == null) break;
             killer.SetHiddenForKillcam(true);
             Progress = Mathf.InverseLerp(from, to, playhead);
             if (SampleAt(killerPath, playhead, out var k))
+            {
                 cam.transform.SetPositionAndRotation(k.eye, k.eyeRot);
+                // Aiming down sights: the gun comes up to the eye and the view zooms, like the killer saw it.
+                ads = Mathf.MoveTowards(ads, k.ads, Time.deltaTime * 6f);
+                float eased = ads * ads * (3f - 2f * ads);
+                AdsAmount = eased;
+                if (def != null)
+                {
+                    cam.fieldOfView = Mathf.Lerp(GameSettings.Fov, def.AdsFov > 0f ? def.AdsFov : GameSettings.Fov, eased);
+                    if (gunT != null) gunT.localPosition = Vector3.Lerp(def.HipOffset, new Vector3(0f, -def.SightHeight, def.AdsDistance), eased);
+                    Scoped = def.HasScope && eased > 0.9f;
+                    if (gunT != null) gunT.gameObject.SetActive(!Scoped);
+                }
+            }
             bool dead = playhead >= deathTime;
             if (ghostRoot != null)
             {

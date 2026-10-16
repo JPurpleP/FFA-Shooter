@@ -42,6 +42,32 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   the weapon spawns, back 45 s after being taken); you keep it until you die, then it drops where you fell. (30 m, 2.5 s cooldown.) Reels you in fast; G or Space releases and you keep the
   momentum, so you can swing and launch. Arriving at a ledge pops you up onto it. Cyan brackets = hookable target.
 
+## Game modes (host picks in the lobby)
+- **Free for All:** first to the score limit (10-100).
+- **Team Deathmatch:** Red vs Blue, balanced at the start (late joiners go to the smaller team); no friendly fire;
+  teammates get name tags; first team to the score limit.
+- **Gun Game:** everyone starts on the same 16-step ladder (MP5 ... M1911, then a melee kill). Each kill moves you up;
+  a melee kill also knocks the victim down a level. No pickups or killstreaks.
+- **One in the Chamber:** an M1911 with one bullet that kills anything; a kill earns a bullet; 3 lives; eliminated
+  players spectate (click to switch). Last one standing wins.
+- **Infection:** one in six starts infected (melee only, one-hit kills, 30% faster); anyone they kill turns. Survivors
+  win if anyone is left after 3 minutes.
+After each match: the **final kill** is replayed for everyone (through the winner's eyes, aiming down sights / scoped
+as they were), then a **summary** (top players, your kills / deaths / K/D / best streak / accuracy / favorite weapon)
+and a **map vote** for the next match (host can switch voting off).
+
+## Online
+- **Find a Game** lists public games (Unity Lobby); hosts choose PUBLIC or CODE ONLY.
+- **Chat** (Y), **quick chat** (B, then 1-6), lobby chat panel; names and chat are word-filtered.
+- Host can **kick** from the lobby or Esc > Players (kicked names can't rejoin that game).
+- **Leaderboard** tab: your career (wins, K/D, kills, deaths, matches; matches with 2+ humans) and the global top 50
+  (Unity Leaderboards id `career_wins`, created in the Unity dashboard: sort high to low, keep latest score).
+- Basic server check: anyone moving impossibly fast three times in 30 s is removed.
+
+## Map extras
+- **Jump pads** (6 per map): step on one to be thrown along the chevrons (Downtown's land on shop roofs).
+- **Quick melee** (V), **compass**, and a red **damage-direction** arc around the crosshair.
+
 ## Killstreaks
 Kills since your last death count as a streak (shown bottom-left, with the next reward). Each reward lasts 30 s.
 - **3 in a row: Speed hack.** Double running, walking and sliding speed.
@@ -127,7 +153,7 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   -ffagive <0-4>   start with a weapon    -ffaaim  hold aim-down-sights    -ffalean <-1..1>  hold a lean
   -ffagrapple <pitch>   look up by <pitch> degrees and fire the hook
   -ffagoretest     auto-cycling gore lab   -ffagorepart <0-5>  -ffagoreweapon <0-5>
-  -ffaat <x> <z> <yaw>   teleport   -ffadummy <dist> [-ffadummyyaw <deg>] [-ffadummypose 0-3]   -ffastance 1|2|3|4|5 (crouch, prone, slide, air slide, fly up)   -ffathrowtype 0-3  throw a frag / smoke / rope / molotov with -ffathrow   -ffagive 22-24  give smoke / rope / molotov   -ffadev  enable the F1 panel   -ffaduel  start a golden duel with the first bot
+  -ffaat <x> <z> <yaw>   teleport   -ffadummy <dist> [-ffadummyyaw <deg>] [-ffadummypose 0-3]   -ffamode 0-4 (with -ffalobby -ffastartwhenready)   -ffalobbymap <id>   -ffalistgames   -ffaleaderboard   -ffachat <text>   -ffastance 1|2|3|4|5 (crouch, prone, slide, air slide, fly up)   -ffathrowtype 0-3  throw a frag / smoke / rope / molotov with -ffathrow   -ffagive 22-24  give smoke / rope / molotov   -ffadev  enable the F1 panel   -ffaduel  start a golden duel with the first bot
   -ffashots <prefix> <count> <interval>   screenshot series   -ffascreenshot <file>
   -ffamenutab <0-2>  -ffaskin <id>  -ffaskinline [first] [count]   -ffafire   hold the trigger   -ffathrow  cook and throw a grenade   -ffabotgive <id>  arm all bots        -ffatopdown [size] [x] [z]   orthographic map overview, UI hidden
   ```

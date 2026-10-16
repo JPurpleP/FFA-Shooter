@@ -243,13 +243,41 @@ public partial class GameUI
             y += 30;
         }
 
-        // Score to win: the host sets it (10-100, steps of 5); everyone else sees it.
-        GUI.Label(new Rect(x, y, 200, 20), "SCORE TO WIN", smallStyle);
+        // Game mode: the host picks; everyone sees it.
+        GUI.Label(new Rect(x, y + 10, 120, 20), "MODE", smallStyle);
         if (isHost)
         {
+            var modeLabels = new[] { "FFA", "TEAM DM", "GUN GAME", "1 BULLET", "INFECTION" };
+            float mbw = (iw - 130 - 4 * 6) / 5f;
+            var modeStyle = new GUIStyle(mapButtonStyle) { fontSize = 11 };
+            var modeActive = new GUIStyle(mapButtonActiveStyle) { fontSize = 11 };
+            for (int i = 0; i < 5; i++)
+            {
+                var m = MatchRules.Modes[i];
+                if (GUI.Button(new Rect(x + 130 + i * (mbw + 6), y + 2, mbw, 34), modeLabels[i], MatchRules.Mode == m ? modeActive : modeStyle) && MatchRules.Mode != m)
+                {
+                    MatchRules.SetMode(m);
+                    GameSettings.Mode = i;
+                    GameSettings.Save();
+                }
+            }
+        }
+        else
+            GUI.Label(new Rect(x + 130, y + 4, iw - 130, 30), MatchRules.ModeName(MatchRules.Mode).ToUpper(), h3Style);
+        y += 44;
+        GUI.Label(new Rect(x, y, iw, 22), ModeGoal, smallStyle);
+        y += 26;
+
+        // Score to win: the host sets it (10-100, steps of 5); everyone else sees it. Only the kill-race modes use it.
+        if (MatchRules.UsesScoreLimit)
+        {
+        GUI.Label(new Rect(x, y, 200, 20), MatchRules.Mode == MatchRules.GameMode.TeamDeathmatch ? "TEAM SCORE" : "SCORE TO WIN", smallStyle);
+        if (isHost)
+        {
+            GUI.changed = false;
             float v = GUI.HorizontalSlider(new Rect(x + 130, y + 6, iw - 210, 20), MatchRules.FragLimit, MatchRules.MinFragLimit, MatchRules.MaxFragLimit);
             int kills = Mathf.Clamp(Mathf.RoundToInt(v / 5f) * 5, MatchRules.MinFragLimit, MatchRules.MaxFragLimit);
-            if (kills != MatchRules.FragLimit)
+            if (GUI.changed && kills != MatchRules.FragLimit) // only when the host drags it (not a clamp of a test value)
             {
                 MatchRules.SetFragLimit(kills);
                 GameSettings.FragLimit = kills;
@@ -258,6 +286,19 @@ public partial class GameUI
         }
         GUI.Label(new Rect(x + iw - 70, y - 4, 70, 28), $"{MatchRules.FragLimit}", valueStyle);
         y += 34;
+        }
+
+        // Map vote after each match (host toggle).
+        if (isHost)
+        {
+            GUI.Label(new Rect(x, y + 8, 160, 20), "MAP VOTE", smallStyle);
+            bool on = MatchRules.MapVoteEnabled;
+            if (GUI.Button(new Rect(x + 130, y, 90, 30), "ON", on ? mapButtonActiveStyle : mapButtonStyle) && !on)
+            { MatchRules.SetMapVote(true); GameSettings.MapVote = true; GameSettings.Save(); }
+            if (GUI.Button(new Rect(x + 226, y, 90, 30), "OFF", on ? mapButtonStyle : mapButtonActiveStyle) && on)
+            { MatchRules.SetMapVote(false); GameSettings.MapVote = false; GameSettings.Save(); }
+            y += 40;
+        }
 
         // Map: the host can switch it here (everyone in the lobby follows).
         if (isHost)

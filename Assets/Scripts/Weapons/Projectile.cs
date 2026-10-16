@@ -322,6 +322,7 @@ public class Projectile : NetworkBehaviour
         foreach (var p in new List<FpsPlayer>(FpsPlayer.All))
         {
             if (!p.IsSpawned || p.IsDead || p.InLobby.Value || p.InDuel || p == shooter || p.SpawnProtected) continue;
+            if (shooter != null && shooter.Team.Value != 0 && p.Team.Value == shooter.Team.Value) continue; // not your own team
             Vector3 chest = p.ChestPoint;
             if (Vector3.Distance(from, chest) > WeaponDefs.RopeRadius) continue;
             if (Physics.Linecast(from, chest, 1, QueryTriggerInteraction.Ignore)) continue; // behind cover

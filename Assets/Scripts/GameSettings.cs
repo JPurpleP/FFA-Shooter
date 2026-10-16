@@ -14,7 +14,9 @@ public static class GameSettings
     public static int Map; // map the host starts (MapCatalog index)
     public static bool VSync = true;
     public static int FragLimit = 25;
-    public static bool PublicGame = true; // list hosted games in Find Game // the host's last "score to win" (lobby slider)
+    public static bool PublicGame = true; // list hosted games in Find Game
+    public static int Mode;               // MatchRules.GameMode the host last picked
+    public static bool MapVote = true;    // vote for the next map after each match // the host's last "score to win" (lobby slider)
 
     public static void Load()
     {
@@ -30,6 +32,8 @@ public static class GameSettings
         VSync = PlayerPrefs.GetInt("ffa.vsync", 1) != 0;
         FragLimit = Mathf.Clamp(PlayerPrefs.GetInt("ffa.fraglimit", 25), 10, 100);
         PublicGame = PlayerPrefs.GetInt("ffa.public", 1) != 0;
+        Mode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.mode", 0), 0, 4);
+        MapVote = PlayerPrefs.GetInt("ffa.mapvote", 1) != 0;
         Apply();
     }
 
@@ -47,6 +51,8 @@ public static class GameSettings
         PlayerPrefs.SetInt("ffa.vsync", VSync ? 1 : 0);
         PlayerPrefs.SetInt("ffa.fraglimit", FragLimit);
         PlayerPrefs.SetInt("ffa.public", PublicGame ? 1 : 0);
+        PlayerPrefs.SetInt("ffa.mode", Mode);
+        PlayerPrefs.SetInt("ffa.mapvote", MapVote ? 1 : 0);
         PlayerPrefs.Save();
         Apply();
     }

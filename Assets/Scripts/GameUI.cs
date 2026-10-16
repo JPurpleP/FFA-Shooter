@@ -36,7 +36,9 @@ public partial class GameUI : MonoBehaviour
     public static bool ForceThrow { get; private set; } // -ffathrow: cook and throw a grenade (tests)
     public static bool CenterDot { get; private set; }  // -ffacenterdot: mark the exact screen centre (sight alignment checks)
     static bool autoReady, autoStart, forcePause;
-    static int lobbyMapTest = -1; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
+    static int lobbyMapTest = -1;
+    static int modeOverride = -1; // -ffamode 0-4 (tests)
+    bool wasSummary; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
     static GameUI instance;
@@ -396,6 +398,7 @@ public partial class GameUI : MonoBehaviour
         autoReady = args.Contains("-ffaready");
         autoStart = args.Contains("-ffastartwhenready");
         forcePause = args.Contains("-ffapause");
+        if (int.TryParse(Arg("-ffamode"), out int fm)) modeOverride = Mathf.Clamp(fm, 0, 4);
         if (int.TryParse(Arg("-ffalobbymap"), out int lm)) lobbyMapTest = lm; // host switches to this map once someone joins (tests)
         if (args.Contains("-ffalistgames")) TestListGames();               // tests: log the public game list
         if (args.Contains("-ffaleaderboard")) TestLeaderboard();           // tests: log the global top 10
@@ -504,6 +507,12 @@ public partial class GameUI : MonoBehaviour
         wasInGame = inGame;
 
         LobbyBrowser.Tick();
+        UpdateMatchStats(local);
+        // The summary needs the mouse (map vote); give it back when play resumes.
+        bool summary = inGame && !string.IsNullOrEmpty(winner) && !KillCam.Active;
+        if (summary && Cursor.lockState == CursorLockMode.Locked) SetCursorCaptured(false);
+        if (!summary && wasSummary && inGame) SetCursorCaptured(true);
+        wasSummary = summary;
         bool escUsed = UpdateRebind(); // Esc while waiting for a key cancels the rebind, nothing else
         escUsed |= UpdateChatKeys(inGame, local != null && local.InLobby.Value);
         if (inGame)
@@ -566,6 +575,11 @@ public partial class GameUI : MonoBehaviour
             transport.SetConnectionData("127.0.0.1", p, "0.0.0.0");
         MatchRules.BeginSession(lobby);
         if (lobby && !MatchRules.FragLimitFromCommandLine) MatchRules.SetFragLimit(GameSettings.FragLimit);
+        if (lobby)
+        {
+            MatchRules.SetMode(modeOverride >= 0 ? (MatchRules.GameMode)modeOverride : (MatchRules.GameMode)GameSettings.Mode);
+            MatchRules.SetMapVote(GameSettings.MapVote);
+        }
         status = Net.StartHost() ? "" : online ? "Could not start the online game." : $"Could not host on port {p} (already in use?)";
         if (status != "") RelayConnect.ClearCode();
         if (status == "" && online && lobby && GameSettings.PublicGame) LobbyBrowser.Publish(RelayConnect.Code, LocalPlayerName);
@@ -714,19 +728,24 @@ public partial class GameUI : MonoBehaviour
     /// <summary>Replay through the killer's eyes: letterbox bars, a title and who / what killed you (replaces the HUD).</summary>
     void DrawKillCamOverlay(float w, float h)
     {
+        if (KillCam.Scoped) DrawScope(w, h); // the killer was looking through a scope
         Fill(new Rect(0, 0, w, 56), new Color(0f, 0f, 0f, 0.8f));
         Fill(new Rect(0, h - 64, w, 64), new Color(0f, 0f, 0f, 0.8f));
         Fill(new Rect(0, 56, w, 2), new Color(1f, 0.3f, 0.3f, 0.8f));
-        Shadowed(new Rect(30, 10, 300, 36), "<b>KILLCAM</b>", new GUIStyle(label) { fontSize = 26 }, new Color(1f, 0.3f, 0.3f));
+        Shadowed(new Rect(30, 10, 400, 36), KillCam.IsFinal ? "<b>FINAL KILL</b>" : "<b>KILLCAM</b>", new GUIStyle(label) { fontSize = 26 },
+            KillCam.IsFinal ? new Color(1f, 0.82f, 0.3f) : new Color(1f, 0.3f, 0.3f));
         float remaining = Mathf.Max(0f, FpsPlayer.RespawnDelay - (Time.time - deathTime));
-        Shadowed(new Rect(w - 330, 16, 300, 26), $"Respawning in {remaining:0.0}", new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = 16 }, new Color(1f, 1f, 1f, 0.8f));
+        if (!KillCam.IsFinal)
+            Shadowed(new Rect(w - 330, 16, 300, 26), $"Respawning in {remaining:0.0}", new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = 16 }, new Color(1f, 1f, 1f, 0.8f));
+        else if (!string.IsNullOrEmpty(winner))
+            Shadowed(new Rect(w - 430, 16, 400, 26), $"{winner} WINS", new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = 18, fontStyle = FontStyle.Bold }, new Color(1f, 0.85f, 0.25f));
         string killerHex = ColorUtility.ToHtmlStringRGB(KillCam.KillerColor);
-        Shadowed(new Rect(0, h - 58, w, 22), "KILLED BY", new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold }, new Color(1f, 1f, 1f, 0.6f));
+        Shadowed(new Rect(0, h - 58, w, 22), KillCam.IsFinal ? "WINNING KILL BY" : "KILLED BY", new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold }, new Color(1f, 1f, 1f, 0.6f));
         Shadowed(new Rect(0, h - 38, w, 30), $"<color=#{killerHex}>■</color> <b>{KillCam.KillerName}</b>   <size=14>{KillCam.WeaponName}</size>",
             new GUIStyle(centerLabel) { fontSize = 20 }, Color.white);
         Fill(new Rect(0, h - 3, w * KillCam.Progress, 3), new Color(1f, 0.3f, 0.3f, 0.9f));
         float c2 = w / 2, cy2 = h / 2; // the killer's crosshair
-        var ch = new Color(1f, 1f, 1f, 0.85f);
+        var ch = new Color(1f, 1f, 1f, 0.85f * (1f - KillCam.AdsAmount)); // fades out on the sights
         Fill(new Rect(c2 - 12, cy2 - 1, 8, 2), ch); Fill(new Rect(c2 + 4, cy2 - 1, 8, 2), ch);
         Fill(new Rect(c2 - 1, cy2 - 12, 2, 8), ch); Fill(new Rect(c2 - 1, cy2 + 4, 2, 8), ch);
         Fill(new Rect(c2 - 1, cy2 - 1, 2, 2), ch);
@@ -735,9 +754,14 @@ public partial class GameUI : MonoBehaviour
     void DrawHud(float w, float h)
     {
         var me = FpsPlayer.Local;
-        if (me.IsDead && KillCam.Active)
+        if (KillCam.Active)
         {
             DrawKillCamOverlay(w, h);
+            return;
+        }
+        if (!string.IsNullOrEmpty(winner))
+        {
+            DrawMatchSummary(me, w, h);
             return;
         }
         float t = Time.time;
@@ -770,6 +794,7 @@ public partial class GameUI : MonoBehaviour
         if (!me.IsDead) DrawSpawnProtection(me, w, h, scale);
         if (!me.IsDead) DrawDamageIndicators(me, w, h, t);
         if (!me.IsDead) DrawCompass(me, w);
+        if (!me.IsDead) DrawTeamMarkers(me, w, h, scale);
         DrawChat(w, h);
 
         // Crosshair (fades out while aiming down sights) + hit marker
@@ -955,8 +980,7 @@ public partial class GameUI : MonoBehaviour
         var players = FpsPlayer.All.Where(p => p.IsSpawned)
             .OrderByDescending(p => p.Kills.Value).ThenBy(p => p.Deaths.Value).ToList();
         var leader = players.FirstOrDefault();
-        string top = $"First to {MatchRules.FragLimit} kills  ·  You: {me.Kills.Value}";
-        if (leader != null && leader != me) top += $"  ·  Leader: {leader.DisplayName} ({leader.Kills.Value})";
+        string top = ModeTopLine(me, players);
         Shadowed(new Rect(0, 10, w, 24), top, centerLabel, Color.white);
         // Top-left: how friends join (online code, or the host's LAN address).
         if (!DevPanel.Open)
@@ -979,13 +1003,14 @@ public partial class GameUI : MonoBehaviour
         if (me.IsDead)
         {
             float remaining = Mathf.Max(0f, FpsPlayer.RespawnDelay - (t - deathTime));
-            string who = string.IsNullOrEmpty(me.LastKillerName) ? "YOU DIED" : $"KILLED BY {me.LastKillerName.ToUpper()}";
+            string who = me.Eliminated.Value ? "ELIMINATED" : string.IsNullOrEmpty(me.LastKillerName) ? "YOU DIED" : $"KILLED BY {me.LastKillerName.ToUpper()}";
             Shadowed(new Rect(0, h / 2 - 110, w, 50), who, hugeLabel, new Color(1f, 0.3f, 0.3f));
             Shadowed(new Rect(0, h / 2 - 62, w, 30), me.LastDeathDetail, centerLabel, new Color(1f, 0.85f, 0.85f));
-            Shadowed(new Rect(0, h / 2 + 80, w, 30), $"Respawning in {remaining:0.0}", centerLabel, Color.white);
+            if (me.Eliminated.Value)
+                Shadowed(new Rect(0, h / 2 + 80, w, 30), string.IsNullOrEmpty(me.SpectatingName) ? "Out of lives" : $"Spectating {me.SpectatingName}  <size=13>(click to switch)</size>", centerLabel, Color.white);
+            else
+                Shadowed(new Rect(0, h / 2 + 80, w, 30), $"Respawning in {remaining:0.0}", centerLabel, Color.white);
         }
-        if (!string.IsNullOrEmpty(winner))
-            Shadowed(new Rect(0, 120, w, 60), $"{winner} WINS!", hugeLabel, new Color(1f, 0.85f, 0.2f));
         float bannerAge = t - bannerTime;
         if (bannerAge < 3.5f && !me.IsDead)
         {
@@ -997,8 +1022,8 @@ public partial class GameUI : MonoBehaviour
         }
 
         var kb = Keyboard.current;
-        if (Bindings.Held(GameAction.Scoreboard) || ForceScores || !string.IsNullOrEmpty(winner))
-            DrawScoreboard(w, h, players, me);
+        if (Bindings.Held(GameAction.Scoreboard) || ForceScores)
+            DrawScoreboard(w, h, ModeOrder(players), me);
 
         if (CenterDot) // test flag: the exact screen centre, where every shot goes
             Fill(new Rect(w / 2 - 1f, h / 2 - 1f, 2f, 2f), new Color(1f, 0f, 1f, 1f));
@@ -1055,7 +1080,7 @@ public partial class GameUI : MonoBehaviour
         Fill(new Rect(r.x, r.y, bw, 3), new Color(1f, 0.82f, 0.3f, 0.9f));
         Shadowed(new Rect(r.x + 20, r.y + 12, 300, 30), "<b>LEADERBOARD</b>", new GUIStyle(label) { fontSize = 20 }, Color.white);
         string codeText = RelayConnect.Code != "" ? $"Join code <b>{RelayConnect.Code}</b>   ·   " : "";
-        Shadowed(new Rect(r.x + bw - 380, r.y + 16, 360, 24), $"{codeText}First to {MatchRules.FragLimit} kills wins",
+        Shadowed(new Rect(r.x + bw - 380, r.y + 16, 360, 24), $"{codeText}{ModeGoal}",
             new GUIStyle(label) { alignment = TextAnchor.UpperRight, fontSize = 14 }, new Color(1f, 1f, 1f, 0.7f));
 
         float hy = r.y + 52;
@@ -1066,7 +1091,7 @@ public partial class GameUI : MonoBehaviour
         Shadowed(new Rect(r.x + 56, hy, 200, 20), "PLAYER", head, c);
         Shadowed(new Rect(r.x + 300, hy, 50, 20), "KILLS", headR, c);
         Shadowed(new Rect(r.x + 360, hy, 60, 20), "DEATHS", headR, c);
-        Shadowed(new Rect(r.x + 430, hy, 50, 20), "K/D", headR, c);
+        Shadowed(new Rect(r.x + 420, hy, 60, 20), ModeColumnTitle, headR, c);
         Fill(new Rect(r.x + 16, hy + 22, bw - 32, 1), new Color(1f, 1f, 1f, 0.15f));
 
         var cell = new GUIStyle(label) { fontSize = 15 };
@@ -1080,16 +1105,15 @@ public partial class GameUI : MonoBehaviour
             if (p == me) Fill(new Rect(r.x + 10, y - 3, bw - 20, rowH), new Color(1f, 1f, 1f, 0.1f));
             var rankColor = rank == 1 ? new Color(1f, 0.82f, 0.3f) : rank == 2 ? new Color(0.8f, 0.82f, 0.88f) : rank == 3 ? new Color(0.85f, 0.55f, 0.3f) : Color.white;
             Shadowed(new Rect(r.x + 20, y, 40, 24), rank.ToString(), cell, rankColor);
-            Fill(new Rect(r.x + 56, y + 6, 10, 10), p.PlayerColor);
+            Fill(new Rect(r.x + 56, y + 6, 10, 10), p.Team.Value != 0 ? MatchRules.TeamColor(p.Team.Value) : p.PlayerColor);
             string name = p.IsBot.Value ? $"{p.DisplayName} <size=11>[BOT]</size>" : p.DisplayName;
             if (p == me) name += " <size=11>(you)</size>";
             Shadowed(new Rect(r.x + 74, y, 220, 24), name, cell, p.IsDead ? new Color(1f, 1f, 1f, 0.5f) : Color.white);
             Shadowed(new Rect(r.x + 300, y, 50, 24), p.Kills.Value.ToString(), cellR, Color.white);
             Shadowed(new Rect(r.x + 360, y, 60, 24), p.Deaths.Value.ToString(), cellR, Color.white);
-            float kd = p.Deaths.Value == 0 ? p.Kills.Value : p.Kills.Value / (float)p.Deaths.Value;
-            Shadowed(new Rect(r.x + 430, y, 50, 24), kd.ToString("0.00"), cellR, Color.white);
-            // Progress toward the frag limit
-            float frac = Mathf.Clamp01(p.Kills.Value / (float)MatchRules.FragLimit);
+            Shadowed(new Rect(r.x + 410, y, 70, 24), ModeColumn(p), new GUIStyle(cellR) { richText = true }, Color.white);
+            // Progress toward winning (per mode)
+            float frac = Mathf.Clamp01(ModeProgress(p));
             Fill(new Rect(r.x + 496, y + 9, 44, 5), new Color(1f, 1f, 1f, 0.12f));
             Fill(new Rect(r.x + 496, y + 9, 44 * frac, 5), rankColor);
             y += rowH;

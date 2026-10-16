@@ -26,8 +26,8 @@ public class SpawnPoint : MonoBehaviour
             float nearest = float.MaxValue;
             foreach (var p in players)
             {
-                if (p == forPlayer || !p.IsSpawned || p.IsDead)
-                    continue;
+                if (p == forPlayer || !p.IsSpawned || p.IsDead || (forPlayer != null && !forPlayer.IsEnemyOf(p)))
+                    continue; // only enemies matter (teammates are fine to spawn near)
                 nearest = Mathf.Min(nearest, Vector3.Distance(p.transform.position, sp.transform.position));
             }
             scored.Add((sp, nearest));

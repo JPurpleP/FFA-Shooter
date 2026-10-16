@@ -157,6 +157,15 @@ public class FpsPlayer : NetworkBehaviour
     public readonly NetworkVariable<byte> MatchFragLimit = new();
     /// <summary>The game mode (server written, mirrored on every player like the frag limit).</summary>
     public readonly NetworkVariable<byte> MatchMode = new();
+    // Game-mode state (server written).
+    public readonly NetworkVariable<byte> Team = new();          // Team DM: 1 red / 2 blue; Infection: 1 survivor / 2 infected
+    public readonly NetworkVariable<byte> GunLevel = new();      // Gun Game: index into the ladder
+    public readonly NetworkVariable<byte> Lives = new();         // One in the Chamber
+    public readonly NetworkVariable<bool> Eliminated = new();    // One in the Chamber: out of lives (spectating)
+    public readonly NetworkVariable<double> MatchTimerEnd = new(); // Infection: server time the clock runs out
+    public readonly NetworkVariable<bool> MapVoteOn = new(true);
+    /// <summary>The ragdoll from this player's last death (every client), for the final killcam.</summary>
+    public Transform LastCorpse { get; private set; }
     /// <summary>Readied up in the lobby (bots are always ready).</summary>
     public readonly NetworkVariable<bool> Ready = new(false,
         NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -206,7 +215,9 @@ public class FpsPlayer : NetworkBehaviour
     float AdsEased => adsT * adsT * (3f - 2f * adsT);
     public bool IsScoped => adsT > 0.9f && CurrentDef != null && CurrentDef.HasScope && !IsDead;
     public float Lean => lean;
-    public Stance CurrentStance => IsOwner ? (sliding ? Stance.Slide : stance) : (Stance)netStance.Value;
+    public Stance CurrentStance => IsOwner ? (sliding ? Stance.Slide : stance) : (Stance)(netStance.Value & 0x7F);
+    /// <summary>How far down the sights this player is (exact for the owner; 0 / 1 for everyone else, from the network).</summary>
+    public float AimAmount => IsOwner ? adsT : (netStance.Value & 0x80) != 0 ? 1f : 0f;
     public bool IsGrappling => grappling;
     public bool GrappleAimValid { get; private set; }
     public float GrappleCooldownLeft => DevSettings.NoGrappleCooldown ? 0f : Mathf.Max(0f, grappleReadyAt - Time.time);
@@ -345,6 +356,8 @@ public class FpsPlayer : NetworkBehaviour
             InLobby.Value = MatchRules.LobbyOpen;
             MatchFragLimit.Value = (byte)MatchRules.FragLimit;
             MatchMode.Value = (byte)MatchRules.Mode;
+            MapVoteOn.Value = MatchRules.MapVoteEnabled;
+            if (!MatchRules.LobbyOpen && MatchRules.UseLobby) MatchRules.SetUpLateJoiner(this);
             // Kicked players can't come back under the same name.
             PlayerName.OnValueChanged += (_, now) =>
             {
@@ -353,6 +366,7 @@ public class FpsPlayer : NetworkBehaviour
             };
         }
         InLobby.OnValueChanged += OnLobbyChanged;
+        Eliminated.OnValueChanged += (_, now) => { if (now) eliminatedSince = Time.time; };
         Protected.OnValueChanged += (_, on) => { if (on) protectStartedLocal = Time.time; };
         if (Protected.Value) protectStartedLocal = Time.time;
         Ready.OnValueChanged += (_, now) => { if (IsServer && InLobby.Value) Debug.Log($"[FFA] {DisplayName} is {(now ? "ready" : "not ready")}"); };
@@ -423,6 +437,23 @@ public class FpsPlayer : NetworkBehaviour
     void LateUpdate()
     {
         if (!IsSpawned || !IsLocalHuman) return;
+        if (IsDead && Eliminated.Value && Time.time - eliminatedSince > 3f)
+        {
+            // Out of lives: watch the players still in it (click to switch).
+            var alive = new List<FpsPlayer>();
+            foreach (var p in All) if (p != this && p.IsSpawned && !p.IsDead && !p.Eliminated.Value) alive.Add(p);
+            if (alive.Count > 0)
+            {
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) spectateIndex++;
+                var target = alive[((spectateIndex % alive.Count) + alive.Count) % alive.Count];
+                SpectatingName = target.DisplayName;
+                var cam = playerCamera.transform;
+                Vector3 want = target.Head.position - target.Head.forward * 3.2f + Vector3.up * 0.9f;
+                cam.position = Vector3.Lerp(cam.position, want, 1f - Mathf.Exp(-6f * Time.deltaTime));
+                cam.rotation = Quaternion.Slerp(cam.rotation, Quaternion.LookRotation(target.Head.position + target.Head.forward * 4f - cam.position), 1f - Mathf.Exp(-8f * Time.deltaTime));
+                return;
+            }
+        }
         if (IsDead && deathCamTarget != null)
         {
             var cam = playerCamera.transform;
@@ -509,6 +540,7 @@ public class FpsPlayer : NetworkBehaviour
             float speedScale = def != null ? def.MoveSpeedScale : 1f;
             speedScale *= Mathf.Lerp(1f, 0.55f, adsT) * Mathf.Lerp(1f, 0.6f, Mathf.Abs(lean));
             speedScale *= stance == Stance.Prone ? 0.24f : stance == Stance.Crouch ? 0.55f : 1f;
+            if (MatchRules.Mode == MatchRules.GameMode.Infection && Team.Value == MatchRules.Infected) speedScale *= 1.3f; // the infected are fast
             bool sprint = input.Sprint && input.Move.y > 0.1f && adsT < 0.2f && stance == Stance.Stand;
             Vector3 move = transform.TransformDirection(Vector3.ClampMagnitude(new Vector3(input.Move.x, 0f, input.Move.y), 1f))
                            * (sprint ? sprintSpeed : walkSpeed) * speedScale;
@@ -583,7 +615,7 @@ public class FpsPlayer : NetworkBehaviour
 
         netPosition.Value = transform.position;
         netLook.Value = new Vector3(pitch, yaw, lean);
-        netStance.Value = (byte)CurrentStance;
+        netStance.Value = (byte)((byte)CurrentStance | (adsT > 0.5f ? 0x80 : 0)); // top bit: aiming down sights (killcams)
         if (!inv.Same(netInventory.Value)) netInventory.Value = inv;
     }
 
@@ -762,6 +794,7 @@ public class FpsPlayer : NetworkBehaviour
 
     void Fire(WeaponDef def, int slot)
     {
+        if (IsLocalHuman) GameUI.NoteShot();
         if (!InfiniteAmmo) inv.SetMag(slot, inv.Mag(slot) - 1);
         nextFireTime = Time.time + def.FireInterval;
 
@@ -1111,7 +1144,7 @@ public class FpsPlayer : NetworkBehaviour
         transform.position = pos;
         transform.rotation = Quaternion.Euler(0f, look.y, 0f);
         lean = look.z;
-        ApplyControllerShape((Stance)netStance.Value);
+        ApplyControllerShape((Stance)(netStance.Value & 0x7F));
         ApplyHeadPose(look.x, lean);
     }
 
@@ -1163,6 +1196,7 @@ public class FpsPlayer : NetworkBehaviour
                 break;
             }
             int amount = Mathf.Max(1, Mathf.RoundToInt(v.dmg));
+            if (MatchRules.Mode == MatchRules.GameMode.OneInTheChamber) amount = 999; // one bullet, one kill
             var info = new DeathInfo
             {
                 Point = v.point, Direction = v.dir, Weapon = (byte)def.Id, Part = (byte)v.part,
@@ -1186,6 +1220,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         if (!IsLocalHuman) return;
         GameUI.ShowHitMarker(headshot, killed, damage, point);
+        if (damage > 0) GameUI.NoteHit(killed, MeleeSwing < 1f ? WeaponId.Melee : InDuel ? WeaponId.Fists : CurrentDef != null ? CurrentDef.Id : WeaponId.Melee);
         audioSource.PlayOneShot(Sfx.HitTick, killed ? 0.8f : 0.5f);
     }
 
@@ -1194,6 +1229,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         if (!IsServer || IsDead || InLobby.Value) return false;
         if (SpawnProtected && amount < 9999) return false; // falls and executions still count
+        if (attacker != null && attacker != this && Team.Value != 0 && attacker.Team.Value == Team.Value) return false; // no friendly fire
         if (DevSettings.GodMode && !botOnServer && OwnerClientId == NetworkManager.ServerClientId && amount < 9999) return false;
         if (botOnServer && brain != null && brain.invulnerable && amount < 9999) return false;
         Health.Value = Mathf.Max(0, Health.Value - amount);
@@ -1255,6 +1291,7 @@ public class FpsPlayer : NetworkBehaviour
 
     void DropWeapons(Vector3 at)
     {
+        if (!MatchRules.PickupsAllowed) return; // modes with fixed loadouts leave nothing behind
         var i = Inv;
         for (int slot = 0; slot < 2; slot++)
         {
@@ -1273,6 +1310,7 @@ public class FpsPlayer : NetworkBehaviour
     void DeathRpc(DeathInfo info, FixedString32Bytes killer, ulong killerId)
     {
         Transform corpse = body != null ? Gore.SpawnCorpse(body, info) : null;
+        LastCorpse = corpse;
         ApplyAliveState();
         if (IsLocalHuman)
         {
@@ -1294,6 +1332,7 @@ public class FpsPlayer : NetworkBehaviour
     IEnumerator RespawnAfterDelay()
     {
         yield return new WaitForSeconds(RespawnDelay);
+        if (Eliminated.Value) { respawnRoutine = null; yield break; } // One in the Chamber: out of lives
         respawnRoutine = null;
         Respawn();
     }
@@ -1323,6 +1362,7 @@ public class FpsPlayer : NetworkBehaviour
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, spawnYaw, 0f));
         ServerMovementGrace();
         TeleportRpc(position, spawnYaw);
+        ServerApplyLoadout();
     }
 
     /// <summary>Server: move this player somewhere (dev tools / screenshot tests). Keeps health and weapons.</summary>
@@ -1387,7 +1427,7 @@ public class FpsPlayer : NetworkBehaviour
     [Rpc(SendTo.Server)]
     void InteractRpc(ulong pickupId)
     {
-        if (IsDead || InDuel) return;
+        if (IsDead || InDuel || !MatchRules.PickupsAllowed) return;
         if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(pickupId, out var obj)) return;
         var pickup = obj.GetComponent<WeaponPickup>();
         if (pickup == null || !pickup.Available) return;
@@ -1468,6 +1508,7 @@ public class FpsPlayer : NetworkBehaviour
     public void ServerAddStreak()
     {
         Streak.Value++;
+        if (!MatchRules.StreaksAllowed) return; // no killstreak rewards in Gun Game / One in the Chamber / Infection
         if (Streak.Value == SpeedStreak)
         {
             SpeedUntil.Value = ServerNow + StreakRewardSeconds;
@@ -1515,7 +1556,8 @@ public class FpsPlayer : NetworkBehaviour
     }
 
     /// <summary>Enemy (or duel opponent) worth targeting: alive, in the same arena context.</summary>
-    public bool IsEnemyOf(FpsPlayer other) => other != null && other != this && other.IsSpawned && !other.IsDead && !other.InLobby.Value && other.DuelSlot.Value == DuelSlot.Value;
+    public bool IsEnemyOf(FpsPlayer other) => other != null && other != this && other.IsSpawned && !other.IsDead && !other.InLobby.Value
+                                              && !other.Eliminated.Value && other.DuelSlot.Value == DuelSlot.Value && (Team.Value == 0 || other.Team.Value != Team.Value);
 
     FpsPlayer aimbotLock; // owner: who the aimbot is locked onto this frame
     bool AimbotLocked => aimbotLock != null && AimbotActive && !aimbotLock.IsDead;
@@ -2338,6 +2380,78 @@ public class FpsPlayer : NetworkBehaviour
         meleeTime = Time.time;
         audioSource.PlayOneShot(hit ? Sfx.Punch : Sfx.Swing, 0.8f);
     }
+
+    // ------------------------------------------------------------------ game modes
+
+    int spectateIndex;
+    float eliminatedSince = -100f;
+    public string SpectatingName { get; private set; } = "";
+
+    /// <summary>Server: hand out the mode's loadout (after a respawn, or a Gun Game level up).</summary>
+    public void ServerApplyLoadout()
+    {
+        switch (MatchRules.Mode)
+        {
+            case MatchRules.GameMode.GunGame:
+            {
+                var w = MatchRules.GunLadder[Mathf.Clamp(GunLevel.Value, 0, MatchRules.GunLadder.Length - 1)];
+                var def = WeaponDefs.Get(w);
+                if (w == WeaponId.Melee) LoadoutRpc(-1, 0, 0);
+                else LoadoutRpc((int)w, def.MagSize, def.MagSize * 20);
+                break;
+            }
+            case MatchRules.GameMode.OneInTheChamber:
+                LoadoutRpc((int)WeaponId.M1911, 1, 0);
+                break;
+            case MatchRules.GameMode.Infection:
+                if (Team.Value == MatchRules.Infected) LoadoutRpc(-1, 0, 0); // claws only
+                break;
+        }
+    }
+
+    /// <summary>Owner: the mode decides what you carry (one gun or nothing, no grenades).</summary>
+    [Rpc(SendTo.Owner)]
+    void LoadoutRpc(int weapon, int mag, int reserve)
+    {
+        inv = new Inventory { W0 = weapon, M0 = mag, R0 = reserve, W1 = -1, Active = 0 };
+        reloading = false;
+        adsT = 0f;
+        drawEndTime = Time.time + 0.35f;
+        if (weapon >= 0) audioSource.PlayOneShot(Sfx.Pickup, 0.6f);
+    }
+
+    /// <summary>Server, One in the Chamber: a kill earns a bullet.</summary>
+    public void ServerGiveBullet() => BulletRpc();
+
+    [Rpc(SendTo.Owner)]
+    void BulletRpc()
+    {
+        int slot = inv.SlotOf((int)WeaponId.M1911);
+        if (slot < 0) return;
+        inv.SetMag(slot, inv.Mag(slot) + 1);
+        audioSource.PlayOneShot(Sfx.ShellInsert, 0.7f);
+    }
+
+    /// <summary>Server: tell everyone to replay the match-winning kill.</summary>
+    public void BroadcastFinalKill(ulong victimId, byte weapon) => FinalKillRpc(victimId, weapon);
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void FinalKillRpc(ulong victimId, byte weapon)
+    {
+        if (NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(victimId, out var obj) && obj.TryGetComponent<FpsPlayer>(out var victim))
+            KillCam.PlayFinal(this, victim, (WeaponId)weapon, victim.LastCorpse);
+    }
+
+    /// <summary>Owner: vote for the next map on the summary screen.</summary>
+    public void CastVote(int map) => VoteRpc(map);
+
+    [Rpc(SendTo.Server)]
+    void VoteRpc(int map) => MatchRules.CastVote(OwnerClientId, map, this);
+
+    public void BroadcastVotes(int a, int b, int c) => VotesRpc(a, b, c);
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void VotesRpc(int a, int b, int c) => GameUI.SetVoteCounts(a, b, c);
 
     // ------------------------------------------------------------------ chat
 

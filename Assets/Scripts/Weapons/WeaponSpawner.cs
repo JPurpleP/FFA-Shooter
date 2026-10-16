@@ -54,6 +54,12 @@ public class WeaponSpawner : MonoBehaviour
             usedThisMatch = false;
             return;
         }
+        if (!MatchRules.PickupsAllowed)
+        {
+            // Fixed-loadout modes: nothing lying around.
+            if (current != null && current.IsSpawned) current.Despawn();
+            return;
+        }
         if (!wasServer)
         {
             wasServer = true;

@@ -81,9 +81,20 @@ public class BotBrain : MonoBehaviour
                 if (fighting)
                 {
                     Status = $"fighting {target.DisplayName}";
-                    Strafe(ref input, 0.6f, 1.6f);
                     float dist = Vector3.Distance(me.transform.position, target.transform.position);
                     var def = me.CurrentDef;
+                    // No gun (Infection claws, Gun Game's last step) or out of bullets (One in the Chamber): rush in and melee.
+                    if (def == null || (me.CurrentMag == 0 && me.CurrentReserve == 0))
+                    {
+                        Status = $"rushing {target.DisplayName}";
+                        MoveAlongPath(ref input, target.transform.position, false, 1f);
+                        if (dist < 5f) input.Move = new Vector2(0f, 1f); // facing them already: straight in
+                        input.Sprint = dist > 3f;
+                        input.FireHeld = input.FirePressed = false;
+                        input.Melee = dist < 2.1f;
+                        break;
+                    }
+                    Strafe(ref input, 0.6f, 1.6f);
                     bool closeRange = def != null && def.Pellets > 1;
                     if (dist > (closeRange ? 6f : 25f)) MoveAlongPath(ref input, target.transform.position, false, 0.8f);
                     else if (dist < 5f && !closeRange) input.Move.y = -0.7f;
@@ -187,7 +198,7 @@ public class BotBrain : MonoBehaviour
         float bestDist = range;
         foreach (var p in FpsPlayer.All)
         {
-            if (p == me || !p.IsSpawned || p.IsDead || p.InDuel) continue;
+            if (p == me || !p.IsSpawned || p.IsDead || p.InDuel || !me.IsEnemyOf(p)) continue; // never teammates
             if (DevSettings.BotsTargetHumansOnly && p.IsBot.Value) continue;
             float d = Vector3.Distance(p.transform.position, me.transform.position);
             if (d < bestDist && CanSee(p))
@@ -245,6 +256,7 @@ public class BotBrain : MonoBehaviour
             if (goalPickup != null) goal = goalPickup.transform.position;
             else if (Time.time - lastSeenTime < 6f) goal = lastSeenTargetPos;
             else if (me.EspActive && NearestEnemy() is { } prey) goal = prey.transform.position; // ESP: hunt through walls
+            else if (!MatchRules.PickupsAllowed && NearestEnemy() is { } hunted) goal = hunted.transform.position; // fixed-loadout modes: go find someone
             else if (path == null || pathIndex >= path.Count) goal = BotNav.RandomNode();
             path = BotNav.FindPath(me.transform.position, goal);
             pathIndex = 0;

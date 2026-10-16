@@ -9,10 +9,10 @@ using UnityEngine;
 /// Command-line test sessions skip the lobby and simply reset scores and respawn everyone.
 /// Lives on the NetworkManager object; results are broadcast through player RPCs.
 /// </summary>
-public class MatchRules : MonoBehaviour
+public partial class MatchRules : MonoBehaviour
 {
     public int fragLimit = 25;
-    public float restartDelay = 8f;
+    public float restartDelay = RestartDelaySeconds;
 
     static MatchRules instance;
 
@@ -59,9 +59,11 @@ public class MatchRules : MonoBehaviour
         LobbyOpen = false;
         IsMatchOver = false;
         FpsPlayer announcer = null;
-        foreach (var p in FpsPlayer.All.ToArray())
+        var players = new List<FpsPlayer>();
+        foreach (var p in FpsPlayer.All) if (p.IsSpawned) players.Add(p);
+        SetUpMode(players);
+        foreach (var p in players)
         {
-            if (!p.IsSpawned) continue;
             p.Kills.Value = 0;
             p.Deaths.Value = 0;
             p.ServerResetStreak();
@@ -128,11 +130,7 @@ public class MatchRules : MonoBehaviour
             text = $"{killer.DisplayName} [{def?.Name}] {victim.DisplayName}{extra}";
         victim.BroadcastKillFeed(new FixedString128Bytes(text.Length > 120 ? text.Substring(0, 120) : text));
 
-        if (instance == null || IsMatchOver || killer == null || killer == victim || killer.Kills.Value < instance.fragLimit)
-            return;
-        IsMatchOver = true;
-        killer.BroadcastMatchState(new FixedString32Bytes(killer.DisplayName));
-        instance.StartCoroutine(instance.RestartMatch());
+        ApplyModeRules(killer, victim, info);
     }
 
     IEnumerator RestartMatch()
@@ -145,9 +143,11 @@ public class MatchRules : MonoBehaviour
             yield break;
         }
         FpsPlayer announcer = null;
-        foreach (var p in FpsPlayer.All.ToArray())
+        var all = new List<FpsPlayer>();
+        foreach (var p in FpsPlayer.All) if (p.IsSpawned) all.Add(p);
+        SetUpMode(all);
+        foreach (var p in all)
         {
-            if (!p.IsSpawned) continue;
             p.Kills.Value = 0;
             p.Deaths.Value = 0;
             p.ServerResetStreak();
@@ -165,11 +165,13 @@ public class MatchRules : MonoBehaviour
         LobbyOpen = true;
         foreach (var p in FpsPlayer.All.ToArray())
             if (p.IsSpawned) p.ServerEnterLobby();
+        ApplyVotes();
         Debug.Log("[FFA] Back to the lobby");
     }
 
     /// <summary>Quick-melee damage (game modes may change it).</summary>
-    public static int MeleeDamage(FpsPlayer attacker) => 55;
+    public static int MeleeDamage(FpsPlayer attacker) =>
+        Mode is GameMode.GunGame or GameMode.OneInTheChamber || (Mode == GameMode.Infection && attacker.Team.Value == Infected) ? 100 : 55;
 
     // ------------------------------------------------------------------ game modes (more in the mode rules below)
 
@@ -225,7 +227,13 @@ public class MatchRules : MonoBehaviour
     public static bool LocalWon(string winnerText)
     {
         var me = FpsPlayer.Local;
-        return me != null && winnerText == me.DisplayName;
+        if (me == null) return false;
+        return Mode switch
+        {
+            GameMode.TeamDeathmatch => winnerText == TeamName(me.Team.Value),
+            GameMode.Infection => (winnerText == "THE SURVIVORS" && me.Team.Value == Survivor) || (winnerText == "THE INFECTED" && me.Team.Value == Infected),
+            _ => winnerText == me.DisplayName,
+        };
     }
 
     public static bool IsBanned(string name) => banned.Contains((name ?? "").Trim().ToLowerInvariant());

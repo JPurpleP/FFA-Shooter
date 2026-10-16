@@ -51,6 +51,7 @@ public class DuelManager : MonoBehaviour
     public static bool TryStart(FpsPlayer shooter, FpsPlayer victim)
     {
         if (instance == null || shooter == null || victim == null || shooter == victim) return false;
+        if (!shooter.IsEnemyOf(victim)) return false; // not a teammate
         if (shooter.IsDead || victim.IsDead || shooter.InDuel || victim.InDuel || Find(shooter) != null || Find(victim) != null) return false;
         int slot = FreeSlot();
         if (slot < 0) return false;
