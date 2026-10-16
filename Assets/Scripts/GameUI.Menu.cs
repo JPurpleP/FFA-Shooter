@@ -339,6 +339,7 @@ public partial class GameUI
             GUI.Label(new Rect(x + iw - 200, y + 4, 186, 26), state, stateStyle);
             if (isHost && !p.IsHostPlayer && GUI.Button(new Rect(x + iw - 280, y + 5, 70, 24), "KICK", mapButtonStyle))
                 MatchRules.Kick(p);
+            if (p != me && !p.IsBot.Value) MuteButton(p, new Rect(x + iw - 360, y + 5, 74, 24));
             if (!p.IsHostPlayer)
                 Fill(new Rect(x + iw - 6, y, 6, 34), ready ? new Color(0.3f, 0.9f, 0.4f) : new Color(0.9f, 0.3f, 0.25f));
             y += 40;
@@ -431,7 +432,7 @@ public partial class GameUI
 
     // ------------------------------------------------------------------ Options (main menu Settings and the Esc menu)
 
-    enum OptionsTab { General, Controls, Keybindings }
+    enum OptionsTab { General, Controls, Keybindings, Voice }
     OptionsTab optionsTab;
     int rebinding = -1; // index into Bindings.All while waiting for a key
     Vector2 bindScroll;
@@ -440,7 +441,7 @@ public partial class GameUI
     {
         GUI.Label(new Rect(r.x, r.y, 300, 40), title, h2Style);
         // Tabs.
-        float tw = 150, tx = r.xMax - tw * 3 - 16;
+        float tw = 130, tx = r.xMax - tw * 4 - 24;
         foreach (OptionsTab t in System.Enum.GetValues(typeof(OptionsTab)))
         {
             if (GUI.Button(new Rect(tx, r.y + 4, tw, 34), t.ToString().ToUpper(), optionsTab == t ? mapButtonActiveStyle : mapButtonStyle) && optionsTab != t)
@@ -456,6 +457,7 @@ public partial class GameUI
             case OptionsTab.General: DrawGeneralOptions(body); break;
             case OptionsTab.Controls: DrawControlOptions(body); break;
             case OptionsTab.Keybindings: DrawKeybindings(body); break;
+            case OptionsTab.Voice: DrawVoiceOptions(body); break;
         }
     }
 
@@ -555,6 +557,53 @@ public partial class GameUI
         if (changed) GameSettings.Save();
         if (GUI.Button(new Rect(r.x, y + 4, 300, 44), "RESET TO DEFAULTS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
             GameSettings.ResetToDefaults();
+    }
+
+    void DrawVoiceOptions(Rect r)
+    {
+        float y = r.y + 4;
+        bool changed = false;
+        GUI.Label(new Rect(r.x, y, 300, 20), "VOICE CHAT  ·  PLAYERS WITHIN 40 M HEAR YOU", smallStyle);
+        string[] modes = { "OFF", "PUSH TO TALK", "OPEN MIC" };
+        float bw = (r.width - 120 - 16) / 3f;
+        for (int i = 0; i < 3; i++)
+            if (GUI.Button(new Rect(r.x + i * (bw + 8), y + 24, bw, 36), modes[i], GameSettings.VoiceMode == i ? mapButtonActiveStyle : mapButtonStyle) && GameSettings.VoiceMode != i)
+            {
+                GameSettings.VoiceMode = i;
+                changed = true;
+            }
+        y += 76;
+        if (GameSettings.VoiceMode == 1)
+        {
+            GUI.Label(new Rect(r.x, y - 8, r.width, 22), $"<size=13>Hold <b>{Bindings.Label(GameAction.PushToTalk)}</b> to talk (change it under Keybindings).</size>", bodyStyle);
+            y += 22;
+        }
+        Slider(ref y, r, "VOICE VOLUME", ref GameSettings.VoiceVolume, 0f, 2f, v => $"{v * 100f:0}%", ref changed);
+        Slider(ref y, r, "MICROPHONE BOOST", ref GameSettings.MicGain, 0.5f, 4f, v => $"{v * 100f:0}%", ref changed);
+        if (GameSettings.VoiceMode == 2)
+            Slider(ref y, r, "OPEN MIC THRESHOLD", ref GameSettings.VoiceGate, 0.005f, 0.1f, v => $"{v * 1000f:0}", ref changed);
+
+        // Microphone: click to cycle through the devices.
+        GUI.Label(new Rect(r.x, y, 300, 20), "MICROPHONE", smallStyle);
+        var devices = Microphone.devices;
+        string current = string.IsNullOrEmpty(GameSettings.MicDevice) || System.Array.IndexOf(devices, GameSettings.MicDevice) < 0 ? "System default" : GameSettings.MicDevice;
+        if (GUI.Button(new Rect(r.x, y + 24, r.width - 120, 36), devices.Length == 0 ? "No microphone found" : current, mapButtonStyle) && devices.Length > 0)
+        {
+            int i = System.Array.IndexOf(devices, GameSettings.MicDevice);
+            GameSettings.MicDevice = i + 1 < devices.Length ? devices[i + 1] : "";
+            changed = true;
+        }
+        y += 76;
+        // Level meter (live while connected and the mic is on).
+        GUI.Label(new Rect(r.x, y, 300, 20), "MIC LEVEL", smallStyle);
+        var bar = new Rect(r.x, y + 26, r.width - 120, 12);
+        Fill(bar, new Color(1f, 1f, 1f, 0.08f));
+        Fill(new Rect(bar.x, bar.y, bar.width * Mathf.Clamp01(VoiceChat.MicLevel), bar.height), VoiceChat.Transmitting ? new Color(0.3f, 0.95f, 0.45f) : new Color(1f, 1f, 1f, 0.45f));
+        if (GameSettings.VoiceMode == 2)
+            Fill(new Rect(bar.x + bar.width * Mathf.Clamp01(GameSettings.VoiceGate * 6f) - 1, bar.y - 3, 2, bar.height + 6), Accent);
+        string note = VoiceChat.MicError ?? (InSession ? "" : "Join a game to test your mic.");
+        if (note.Length > 0) GUI.Label(new Rect(r.x, y + 42, r.width, 22), $"<size=13>{note}</size>", bodyStyle);
+        if (changed) GameSettings.Save();
     }
 
     void Slider(ref float y, Rect r, string label, ref float value, float min, float max, System.Func<float, string> fmt, ref bool changed)

@@ -6,7 +6,7 @@ public enum GameAction
 {
     Forward, Back, Left, Right, Sprint, Jump, Crouch, Prone, LeanLeft, LeanRight,
     Reload, Interact, Grapple, Grenade, Slot1, Slot2, Slot3, Scoreboard,
-    Melee, Chat, QuickChat,
+    Melee, Chat, QuickChat, PushToTalk,
 }
 
 /// <summary>Keyboard bindings for every <see cref="GameAction"/>, saved between launches.</summary>
@@ -18,7 +18,7 @@ public static class Bindings
     {
         Key.W, Key.S, Key.A, Key.D, Key.LeftShift, Key.Space, Key.LeftCtrl, Key.Z, Key.Q, Key.E,
         Key.R, Key.F, Key.G, Key.T, Key.Digit1, Key.Digit2, Key.Digit3, Key.Tab,
-        Key.V, Key.Y, Key.B,
+        Key.V, Key.Y, Key.B, Key.C,
     };
 
     static Key[] keys;
@@ -55,6 +55,7 @@ public static class Bindings
         GameAction.Melee => "Quick melee",
         GameAction.Chat => "Chat",
         GameAction.QuickChat => "Quick chat",
+        GameAction.PushToTalk => "Push to talk (voice)",
         _ => a.ToString(),
     };
 

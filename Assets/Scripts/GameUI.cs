@@ -385,6 +385,7 @@ public partial class GameUI : MonoBehaviour
     {
         Net.OnClientDisconnectCallback += OnClientDisconnect;
         GraphicsQuality.Apply();
+        VoiceChat.Ensure();
 
         var args = Environment.GetCommandLineArgs();
         string Arg(string flag) { int i = Array.IndexOf(args, flag); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
@@ -724,6 +725,7 @@ public partial class GameUI : MonoBehaviour
             DrawConnecting(w, h);
         else
             DrawHud(w, h);
+        if (InSession) DrawVoice(w, h);
     }
 
     /// <summary>Replay through the killer's eyes: letterbox bars, a title and who / what killed you (replaces the HUD).</summary>
@@ -1175,12 +1177,12 @@ public partial class GameUI : MonoBehaviour
             confirmLeave = false;
         }
         y += 58;
-        if (Net.IsServer && GUI.Button(new Rect(x, y, iw, 46), "PLAYERS  (KICK)", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        if (GUI.Button(new Rect(x, y, iw, 46), Net.IsServer ? "PLAYERS  (MUTE / KICK)" : "PLAYERS  (MUTE)", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
         {
             pausePlayers = true;
             confirmLeave = false;
         }
-        if (Net.IsServer) y += 58;
+        y += 58;
 
         float half = (iw - 12) / 2f;
         var secondary = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };

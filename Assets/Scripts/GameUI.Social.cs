@@ -144,6 +144,40 @@ public partial class GameUI
         }
     }
 
+    // ------------------------------------------------------------------ voice
+
+    void MuteButton(FpsPlayer p, Rect r)
+    {
+        bool muted = VoiceChat.Muted.Contains(p.OwnerClientId);
+        if (VoiceChat.IsTalking(p.OwnerClientId)) Fill(new Rect(r.x - 14, r.y + r.height / 2 - 4, 8, 8), new Color(0.3f, 0.95f, 0.45f));
+        if (GUI.Button(r, muted ? "UNMUTE" : "MUTE", muted ? mapButtonActiveStyle : mapButtonStyle))
+        {
+            if (muted) VoiceChat.Muted.Remove(p.OwnerClientId);
+            else VoiceChat.Muted.Add(p.OwnerClientId);
+        }
+    }
+
+    /// <summary>Who's talking (left side, above the chat) and your own mic while you transmit.</summary>
+    void DrawVoice(float w, float h)
+    {
+        if (GameSettings.VoiceMode == 0) return;
+        var style = new GUIStyle(label) { fontSize = 15 };
+        float x = 32, y = h * 0.42f - 30;
+        if (VoiceChat.Transmitting)
+        {
+            Fill(new Rect(x, y + 6, 10, 10), new Color(0.3f, 0.95f, 0.45f));
+            Shadowed(new Rect(x + 18, y, 300, 22), "<b>MIC ON</b>", style, new Color(0.6f, 1f, 0.7f));
+            y -= 24;
+        }
+        foreach (var p in FpsPlayer.All)
+        {
+            if (p == null || !p.IsSpawned || p == FpsPlayer.Local || p.IsBot.Value || !VoiceChat.IsTalking(p.OwnerClientId)) continue;
+            Fill(new Rect(x, y + 6, 10, 10), p.PlayerColor);
+            Shadowed(new Rect(x + 18, y, 300, 22), $"<b>{p.DisplayName}</b>  <size=12>speaking</size>", style, Color.white);
+            y -= 24;
+        }
+    }
+
     // ------------------------------------------------------------------ kicking (host)
 
     bool pausePlayers; // the Esc menu is showing the player list
@@ -157,6 +191,7 @@ public partial class GameUI
         Fill(new Rect(r.x, r.y, r.width, 3), Accent);
         float x = r.x + 30, iw = pw - 60, y = r.y + 20;
         GUI.Label(new Rect(x, y, iw, 40), "PLAYERS", h2Style);
+        bool host = Net.IsServer;
         y += 56;
         var row = new GUIStyle(bodyStyle) { fontSize = 16, wordWrap = false };
         foreach (var p in FpsPlayer.All.ToArray())
@@ -167,8 +202,9 @@ public partial class GameUI
             Fill(new Rect(x + 10, y + 12, 10, 10), p.PlayerColor);
             string tag = p.IsBot.Value ? "  <size=12>[BOT]</size>" : p.IsHostPlayer ? "  <size=12>HOST</size>" : "";
             GUI.Label(new Rect(x + 30, y + 5, iw - 160, 26), p.DisplayName + tag, row);
-            if (!p.IsHostPlayer && GUI.Button(new Rect(x + iw - 110, y + 3, 104, 28), "KICK", mapButtonStyle))
+            if (host && !p.IsHostPlayer && GUI.Button(new Rect(x + iw - 110, y + 3, 104, 28), "KICK", mapButtonStyle))
                 MatchRules.Kick(p);
+            if (p != FpsPlayer.Local && !p.IsBot.Value) MuteButton(p, new Rect(x + iw - 200, y + 3, 84, 28));
             y += 40;
         }
         var back = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };

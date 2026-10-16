@@ -14,6 +14,9 @@ public static class GameSettings
     public static int Map; // map the host starts (MapCatalog index)
     public static bool VSync = true;
     public static int Graphics = 2; // 0 low, 1 medium, 2 high (GraphicsQuality)
+    public static int VoiceMode = 1; // 0 off, 1 push to talk, 2 open mic (VoiceChat)
+    public static float VoiceVolume = 1f, MicGain = 1f, VoiceGate = 0.02f;
+    public static string MicDevice = ""; // empty: the system default
     public static int FragLimit = 25;
     public static bool PublicGame = true; // list hosted games in Find Game
     public static int Mode;               // MatchRules.GameMode the host last picked
@@ -32,6 +35,11 @@ public static class GameSettings
         Map = Mathf.Max(0, PlayerPrefs.GetInt("ffa.map", 0));
         VSync = PlayerPrefs.GetInt("ffa.vsync", 1) != 0;
         Graphics = Mathf.Clamp(PlayerPrefs.GetInt("ffa.graphics", 2), 0, 2);
+        VoiceMode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.voice", 1), 0, 2);
+        VoiceVolume = PlayerPrefs.GetFloat("ffa.voicevol", 1f);
+        MicGain = PlayerPrefs.GetFloat("ffa.micgain", 1f);
+        VoiceGate = PlayerPrefs.GetFloat("ffa.voicegate", 0.02f);
+        MicDevice = PlayerPrefs.GetString("ffa.mic", "");
         FragLimit = Mathf.Clamp(PlayerPrefs.GetInt("ffa.fraglimit", 25), 10, 100);
         PublicGame = PlayerPrefs.GetInt("ffa.public", 1) != 0;
         Mode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.mode", 0), 0, 4);
@@ -52,6 +60,11 @@ public static class GameSettings
         PlayerPrefs.SetInt("ffa.map", Map);
         PlayerPrefs.SetInt("ffa.vsync", VSync ? 1 : 0);
         PlayerPrefs.SetInt("ffa.graphics", Graphics);
+        PlayerPrefs.SetInt("ffa.voice", VoiceMode);
+        PlayerPrefs.SetFloat("ffa.voicevol", VoiceVolume);
+        PlayerPrefs.SetFloat("ffa.micgain", MicGain);
+        PlayerPrefs.SetFloat("ffa.voicegate", VoiceGate);
+        PlayerPrefs.SetString("ffa.mic", MicDevice);
         PlayerPrefs.SetInt("ffa.fraglimit", FragLimit);
         PlayerPrefs.SetInt("ffa.public", PublicGame ? 1 : 0);
         PlayerPrefs.SetInt("ffa.mode", Mode);

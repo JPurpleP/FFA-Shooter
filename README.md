@@ -29,6 +29,10 @@ road puddles, manholes, trash bags) merged into a few batched meshes per map so 
 - **Lobby.** Hosting or joining puts you in a waiting lobby (player list, join code). Everyone presses **Ready Up**; the
   host's **Start Match** unlocks once every player is ready. The host can also switch the map in the lobby (everyone follows). No bots in normal games (the F1 dev panel can still add them).
   Players who join mid-match drop straight in.
+- **Proximity voice chat:** players within 40 m hear you, quieter with distance and from your direction (everyone hears
+  everyone in the lobby). Push-to-talk on **C** by default (rebindable), or open mic, or off — Options → Voice also has
+  voice volume, mic boost, mic picker and a level meter. Mute anyone from the lobby list or Esc → Players. Built in
+  (16 kHz IMA ADPCM through the host, ~64 kbit/s only while talking); no extra service to set up.
 - **Spawn protection:** for 3 s after spawning you can't be hurt (and can't be pulled into a golden duel). Moving, jumping,
   firing, hooking or throwing ends it early. A "PROTECTED" tag shows over protected enemies in your line of sight.
 - **Killcam:** when someone kills you, the last ~3 seconds are replayed through their eyes (with their gun), with you
