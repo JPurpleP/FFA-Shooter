@@ -356,6 +356,14 @@ public partial class GameUI : MonoBehaviour
     public static void SetWinner(string name)
     {
         if (instance == null) return;
+        // A match just ended: count it in your career (only real matches: two or more humans).
+        if (!string.IsNullOrEmpty(name) && string.IsNullOrEmpty(instance.winner) && FpsPlayer.Local != null)
+        {
+            int humans = 0;
+            foreach (var p in FpsPlayer.All) if (p.IsSpawned && !p.IsBot.Value) humans++;
+            if (humans >= 2)
+                Career.RecordMatch(FpsPlayer.Local.Kills.Value, FpsPlayer.Local.Deaths.Value, MatchRules.LocalWon(name));
+        }
         instance.winner = name;
         instance.winnerTime = Time.time;
         if (!string.IsNullOrEmpty(name))
@@ -389,6 +397,9 @@ public partial class GameUI : MonoBehaviour
         autoStart = args.Contains("-ffastartwhenready");
         forcePause = args.Contains("-ffapause");
         if (int.TryParse(Arg("-ffalobbymap"), out int lm)) lobbyMapTest = lm; // host switches to this map once someone joins (tests)
+        if (args.Contains("-ffalistgames")) TestListGames();               // tests: log the public game list
+        if (args.Contains("-ffaleaderboard")) TestLeaderboard();           // tests: log the global top 10
+        if (Arg("-ffachat") is { } say) StartCoroutine(TestChat(say));     // tests: say something once in a game
         if (int.TryParse(Arg("-ffafraglimit"), out int fragLimit)) MatchRules.OverrideFragLimit(fragLimit);
         if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 2); // screenshot tests
         if (int.TryParse(Arg("-ffaskin"), out int sk)) GameSettings.Skin = Mathf.Clamp(sk, 0, Skins.Count - 1);
@@ -432,6 +443,35 @@ public partial class GameUI : MonoBehaviour
             StartCoroutine(TakeScreenshot(shotPath));
     }
 
+    static async void TestListGames()
+    {
+        await System.Threading.Tasks.Task.Delay(6000);
+        try
+        {
+            var list = await LobbyBrowser.Query();
+            Debug.Log($"[FFA] Public games: {list.Count}");
+            foreach (var g in list) Debug.Log($"[FFA]   {g.Name} | {g.Map} | {g.Mode} | {g.Players} | {g.State} | code {g.Code}");
+        }
+        catch (Exception e) { Debug.Log($"[FFA] Public games query failed: {e.Message}"); }
+    }
+
+    static async void TestLeaderboard()
+    {
+        try
+        {
+            var rows = await Career.Top(10);
+            Debug.Log($"[FFA] Leaderboard rows: {rows.Count}");
+        }
+        catch (Exception e) { Debug.Log($"[FFA] Leaderboard failed: {e.Message}"); }
+    }
+
+    System.Collections.IEnumerator TestChat(string text)
+    {
+        while (FpsPlayer.Local == null) yield return null;
+        yield return new WaitForSeconds(2f);
+        FpsPlayer.Local.SendChat(text);
+    }
+
     void OnDestroy()
     {
         if (Net != null)
@@ -463,13 +503,15 @@ public partial class GameUI : MonoBehaviour
             SetCursorCaptured(false);
         wasInGame = inGame;
 
+        LobbyBrowser.Tick();
         bool escUsed = UpdateRebind(); // Esc while waiting for a key cancels the rebind, nothing else
+        escUsed |= UpdateChatKeys(inGame, local != null && local.InLobby.Value);
         if (inGame)
         {
             var kb = Keyboard.current;
             if (kb != null && kb.escapeKey.wasPressedThisFrame && !DevPanel.Open && !escUsed)
             {
-                if (pauseOptions && Cursor.lockState != CursorLockMode.Locked) pauseOptions = false; // back to the pause menu
+                if ((pauseOptions || pausePlayers) && Cursor.lockState != CursorLockMode.Locked) pauseOptions = pausePlayers = false; // back to the pause menu
                 else SetCursorCaptured(Cursor.lockState != CursorLockMode.Locked);
             }
 
@@ -526,6 +568,7 @@ public partial class GameUI : MonoBehaviour
         if (lobby && !MatchRules.FragLimitFromCommandLine) MatchRules.SetFragLimit(GameSettings.FragLimit);
         status = Net.StartHost() ? "" : online ? "Could not start the online game." : $"Could not host on port {p} (already in use?)";
         if (status != "") RelayConnect.ClearCode();
+        if (status == "" && online && lobby && GameSettings.PublicGame) LobbyBrowser.Publish(RelayConnect.Code, LocalPlayerName);
         Debug.Log(online ? $"[FFA] Hosting online, join code {RelayConnect.Code}: {(status == "" ? "ok" : status)}"
                          : $"[FFA] Hosting on port {p}: {(status == "" ? "ok" : status)}");
     }
@@ -564,7 +607,10 @@ public partial class GameUI : MonoBehaviour
     {
         GetComponent<MatchRules>()?.StopAllCoroutines();
         MatchRules.ResetState();
+        LobbyBrowser.Unpublish();
         Net.Shutdown();
+        chat.Clear();
+        pauseOptions = pausePlayers = chatOpen = quickChatOpen = false;
         RelayConnect.ClearCode();
         killFeed.Clear();
         Gore.ClearAll();
@@ -611,6 +657,7 @@ public partial class GameUI : MonoBehaviour
     void QuitGame()
     {
         LogScores();
+        LobbyBrowser.Unpublish();
         if (InSession) Net.Shutdown();
         // Settings are saved as they change in the menu; saving here would also persist test-flag overrides.
 #if UNITY_EDITOR
@@ -723,6 +770,7 @@ public partial class GameUI : MonoBehaviour
         if (!me.IsDead) DrawSpawnProtection(me, w, h, scale);
         if (!me.IsDead) DrawDamageIndicators(me, w, h, t);
         if (!me.IsDead) DrawCompass(me, w);
+        DrawChat(w, h);
 
         // Crosshair (fades out while aiming down sights) + hit marker
         float cx = w / 2, cy = h / 2;
@@ -1057,6 +1105,7 @@ public partial class GameUI : MonoBehaviour
     void DrawPauseMenu(float w, float h)
     {
         EnsureMenuStyles();
+        if (pausePlayers) { DrawPlayerList(w, h); return; }
         if (pauseOptions)
         {
             Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.55f));
@@ -1072,7 +1121,7 @@ public partial class GameUI : MonoBehaviour
         }
         bool online = RelayConnect.Code != "";
         Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.45f));
-        float pw = 440, ph = online ? 400 : 346;
+        float pw = 440, ph = (online ? 400 : 346) + (Net.IsServer ? 58 : 0);
         var r = new Rect((w - pw) / 2f, (h - ph) / 2f, pw, ph);
         Fill(r, new Color(0.04f, 0.05f, 0.07f, 0.94f));
         Fill(new Rect(r.x, r.y, r.width, 3), Accent);
@@ -1101,6 +1150,12 @@ public partial class GameUI : MonoBehaviour
             confirmLeave = false;
         }
         y += 58;
+        if (Net.IsServer && GUI.Button(new Rect(x, y, iw, 46), "PLAYERS  (KICK)", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        {
+            pausePlayers = true;
+            confirmLeave = false;
+        }
+        if (Net.IsServer) y += 58;
 
         float half = (iw - 12) / 2f;
         var secondary = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };

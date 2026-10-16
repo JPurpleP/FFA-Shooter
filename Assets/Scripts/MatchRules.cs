@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 
@@ -170,5 +171,68 @@ public class MatchRules : MonoBehaviour
     /// <summary>Quick-melee damage (game modes may change it).</summary>
     public static int MeleeDamage(FpsPlayer attacker) => 55;
 
-    public static void ResetState() => IsMatchOver = UseLobby = LobbyOpen = false;
+    // ------------------------------------------------------------------ game modes (more in the mode rules below)
+
+    public enum GameMode : byte { FreeForAll, TeamDeathmatch, GunGame, OneInTheChamber, Infection }
+    public static readonly GameMode[] Modes = { GameMode.FreeForAll, GameMode.TeamDeathmatch, GameMode.GunGame, GameMode.OneInTheChamber, GameMode.Infection };
+    static GameMode serverMode;
+
+    /// <summary>The mode being played (the server's choice; clients read it off the player objects).</summary>
+    public static GameMode Mode
+    {
+        get
+        {
+            var net = Unity.Netcode.NetworkManager.Singleton;
+            if (net != null && net.IsListening && !net.IsServer)
+                foreach (var p in FpsPlayer.All)
+                    if (p.IsSpawned) return (GameMode)p.MatchMode.Value;
+            return serverMode;
+        }
+    }
+
+    public static string ModeName(GameMode m) => m switch
+    {
+        GameMode.TeamDeathmatch => "Team Deathmatch",
+        GameMode.GunGame => "Gun Game",
+        GameMode.OneInTheChamber => "One in the Chamber",
+        GameMode.Infection => "Infection",
+        _ => "Free for All",
+    };
+
+    /// <summary>Server, lobby: the host picked a mode.</summary>
+    public static void SetMode(GameMode m)
+    {
+        serverMode = m;
+        foreach (var p in FpsPlayer.All)
+            if (p.IsSpawned) p.MatchMode.Value = (byte)m;
+    }
+
+    // ------------------------------------------------------------------ kicking
+
+    static readonly HashSet<string> banned = new();
+
+    /// <summary>Server (host): remove a player; they can't come back into this game under that name.</summary>
+    public static void Kick(FpsPlayer p)
+    {
+        if (p == null || !p.IsSpawned || p.IsHostPlayer) return;
+        p.BroadcastKillFeed(new FixedString128Bytes($"{p.DisplayName} was kicked by the host"));
+        if (p.IsBot.Value) { p.NetworkObject.Despawn(true); return; }
+        banned.Add(p.PlayerName.Value.ToString().Trim().ToLowerInvariant());
+        Unity.Netcode.NetworkManager.Singleton.DisconnectClient(p.OwnerClientId, "You were kicked from the game by the host.");
+    }
+
+    /// <summary>Did the local player (or their team) win, given the winner banner text?</summary>
+    public static bool LocalWon(string winnerText)
+    {
+        var me = FpsPlayer.Local;
+        return me != null && winnerText == me.DisplayName;
+    }
+
+    public static bool IsBanned(string name) => banned.Contains((name ?? "").Trim().ToLowerInvariant());
+
+    public static void ResetState()
+    {
+        IsMatchOver = UseLobby = LobbyOpen = false;
+        banned.Clear();
+    }
 }

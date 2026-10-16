@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>Main menu: Play (host / join), Customize (skins with a live 3D preview), Settings.</summary>
 public partial class GameUI
 {
-    enum MenuTab { Play, Customize, Settings }
+    enum MenuTab { Play, FindGame, Leaderboard, Customize, Settings }
 
     static readonly Color Accent = new(1f, 0.55f, 0.15f);
     MenuTab tab = MenuTab.Play;
@@ -88,6 +88,8 @@ public partial class GameUI
 
         float y = 196;
         Nav(ref y, "PLAY", MenuTab.Play);
+        Nav(ref y, "FIND A GAME", MenuTab.FindGame);
+        Nav(ref y, "LEADERBOARD", MenuTab.Leaderboard);
         Nav(ref y, "CUSTOMIZE", MenuTab.Customize);
         Nav(ref y, "SETTINGS", MenuTab.Settings);
         if (GUI.Button(new Rect(48, y, 304, 52), "QUIT", navStyle)) QuitGame();
@@ -103,6 +105,8 @@ public partial class GameUI
         switch (tab)
         {
             case MenuTab.Play: DrawPlayTab(inner); break;
+            case MenuTab.FindGame: DrawFindGameTab(inner); break;
+            case MenuTab.Leaderboard: DrawLeaderboardTab(inner); break;
             case MenuTab.Customize: DrawCustomizeTab(inner); break;
             case MenuTab.Settings: DrawSettingsTab(inner); break;
         }
@@ -146,7 +150,12 @@ public partial class GameUI
                 MapCatalog.Apply(i);
             }
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 170, col - 36, 22), MapCatalog.DescriptionOf(GameSettings.Map), smallStyle);
-        GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 200, col - 36, 44), "Everyone waits in the lobby and readies up; you start the match.", bodyStyle);
+        GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 198, 200, 20), "VISIBILITY", smallStyle);
+        float vw = (col - 36 - 8) / 2f;
+        if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + 220, vw, 32), "PUBLIC", GameSettings.PublicGame ? mapButtonActiveStyle : mapButtonStyle) && !GameSettings.PublicGame)
+        { GameSettings.PublicGame = true; GameSettings.Save(); }
+        if (GUI.Button(new Rect(hostRect.x + 26 + vw, hostRect.y + 220, vw, 32), "CODE ONLY", GameSettings.PublicGame ? mapButtonStyle : mapButtonActiveStyle) && GameSettings.PublicGame)
+        { GameSettings.PublicGame = false; GameSettings.Save(); }
         GUI.enabled = !connecting;
         if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + boxH - 70, col - 36, 50), connecting ? "CONNECTING…" : "HOST GAME", bigButtonStyle))
         {
@@ -202,7 +211,10 @@ public partial class GameUI
 
         Fill(new Rect(0, 0, w, h), new Color(0f, 0f, 0f, 0.35f));
         float pw = Mathf.Min(w - 80, 640), ph = h - 120;
-        var panel = new Rect((w - pw) / 2f, 60, pw, ph);
+        float chatW = Mathf.Min(320f, w - pw - 72f);
+        float left = chatW >= 220f ? (w - pw - chatW - 16f) / 2f : (w - pw) / 2f;
+        var panel = new Rect(left, 60, pw, ph);
+        if (chatW >= 220f) DrawLobbyChat(new Rect(panel.xMax + 16f, 60, chatW, ph));
         Fill(panel, new Color(0.04f, 0.05f, 0.07f, 0.9f));
         Fill(new Rect(panel.x, panel.y, panel.width, 3), Accent);
         float x = panel.x + 30, iw = pw - 60, y = panel.y + 22;
@@ -280,6 +292,8 @@ public partial class GameUI
             bool ready = p.IsHostPlayer || p.Ready.Value;
             string state = p.IsHostPlayer ? "STARTS THE MATCH" : ready ? "READY" : "NOT READY";
             GUI.Label(new Rect(x + iw - 200, y + 4, 186, 26), state, stateStyle);
+            if (isHost && !p.IsHostPlayer && GUI.Button(new Rect(x + iw - 280, y + 5, 70, 24), "KICK", mapButtonStyle))
+                MatchRules.Kick(p);
             if (!p.IsHostPlayer)
                 Fill(new Rect(x + iw - 6, y, 6, 34), ready ? new Color(0.3f, 0.9f, 0.4f) : new Color(0.9f, 0.3f, 0.25f));
             y += 40;

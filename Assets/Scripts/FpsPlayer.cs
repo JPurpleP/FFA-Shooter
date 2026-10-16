@@ -155,6 +155,8 @@ public class FpsPlayer : NetworkBehaviour
     public readonly NetworkVariable<bool> InLobby = new();
     /// <summary>Kills to win this match (server written, mirrored on every player so clients can show it).</summary>
     public readonly NetworkVariable<byte> MatchFragLimit = new();
+    /// <summary>The game mode (server written, mirrored on every player like the frag limit).</summary>
+    public readonly NetworkVariable<byte> MatchMode = new();
     /// <summary>Readied up in the lobby (bots are always ready).</summary>
     public readonly NetworkVariable<bool> Ready = new(false,
         NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -342,6 +344,13 @@ public class FpsPlayer : NetworkBehaviour
         {
             InLobby.Value = MatchRules.LobbyOpen;
             MatchFragLimit.Value = (byte)MatchRules.FragLimit;
+            MatchMode.Value = (byte)MatchRules.Mode;
+            // Kicked players can't come back under the same name.
+            PlayerName.OnValueChanged += (_, now) =>
+            {
+                if (!IsHostPlayer && !IsBot.Value && MatchRules.IsBanned(now.ToString()))
+                    NetworkManager.DisconnectClient(OwnerClientId, "You were kicked from this game by the host.");
+            };
         }
         InLobby.OnValueChanged += OnLobbyChanged;
         Protected.OnValueChanged += (_, on) => { if (on) protectStartedLocal = Time.time; };
@@ -592,7 +601,7 @@ public class FpsPlayer : NetworkBehaviour
             forceFireToggle = !forceFireToggle; // re-pull each frame so semi-autos keep firing too
             input.FireHeld = input.FirePressed = forceFireToggle;
         }
-        if (!GameUI.CursorCaptured) return input;
+        if (!GameUI.CursorCaptured || GameUI.ChatTyping) return input;
         var mouse = Mouse.current;
         if (Keyboard.current != null)
         {
@@ -617,6 +626,7 @@ public class FpsPlayer : NetworkBehaviour
             if (Bindings.Pressed(GameAction.Slot2)) input.SwitchTo = 1;
             if (Bindings.Pressed(GameAction.Slot3)) input.SwitchTo = 2;
             input.Melee = Bindings.Pressed(GameAction.Melee);
+            if (GameUI.QuickChatOpen) input.SwitchTo = -1; // number keys pick a phrase
         }
         if (mouse != null)
         {
@@ -2327,6 +2337,37 @@ public class FpsPlayer : NetworkBehaviour
     {
         meleeTime = Time.time;
         audioSource.PlayOneShot(hit ? Sfx.Punch : Sfx.Swing, 0.8f);
+    }
+
+    // ------------------------------------------------------------------ chat
+
+    float nextChatTime;
+
+    /// <summary>Owner: say something to everyone (filtered and rate-limited by the server).</summary>
+    public void SendChat(string text)
+    {
+        FixedString128Bytes fs = default;
+        fs.CopyFromTruncated(text.Length > 100 ? text.Substring(0, 100) : text);
+        ChatRpc(fs);
+    }
+
+    [Rpc(SendTo.Server)]
+    void ChatRpc(FixedString128Bytes text)
+    {
+        if (Time.time < nextChatTime) return;
+        nextChatTime = Time.time + 0.6f;
+        string clean = NameFilter.Clean(text.ToString().Trim());
+        if (clean.Length == 0) return;
+        FixedString128Bytes fs = default;
+        fs.CopyFromTruncated(clean);
+        ChatLineRpc(fs);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void ChatLineRpc(FixedString128Bytes text)
+    {
+        GameUI.AddChat(DisplayName, PlayerColor, text.ToString());
+        Debug.Log($"[FFA] Chat {DisplayName}: {text}");
     }
 
     // ------------------------------------------------------------------ damage direction

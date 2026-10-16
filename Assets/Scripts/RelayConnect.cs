@@ -49,7 +49,7 @@ public static class RelayConnect
 
     public static void ClearCode() => Code = "";
 
-    static Task EnsureSignedIn() => signIn is { IsFaulted: false, IsCanceled: false } ? signIn : signIn = SignIn();
+    public static Task EnsureSignedIn() => signIn is { IsFaulted: false, IsCanceled: false } ? signIn : signIn = SignIn();
 
     static async Task SignIn()
     {
