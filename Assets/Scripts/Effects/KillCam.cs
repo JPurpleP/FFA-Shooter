@@ -152,7 +152,7 @@ public class KillCam : MonoBehaviour
         cam.cullingMask &= ~(1 << GameAssets.ViewModelLayer);
         cam.fieldOfView = GameSettings.Fov;
         cam.nearClipPlane = 0.03f;
-        if (def != null && weapon != WeaponId.Fists)
+        if (def != null && weapon != WeaponId.Fists && weapon != WeaponId.Melee)
         {
             var gun = WeaponModel.Build(weapon, cam.transform);
             gun.transform.localPosition = def.HipOffset;

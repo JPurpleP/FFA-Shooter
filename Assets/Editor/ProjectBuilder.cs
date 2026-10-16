@@ -732,6 +732,10 @@ public static partial class ProjectBuilder
         Mat("RoofGreen", new Color(0.3f, 0.42f, 0.3f), 0f, 0f, "Shingles", new Vector2(4, 4));
         Mat("TentOrange", new Color(0.95f, 0.5f, 0.12f), 0f, 0f, "Fabric", new Vector2(3, 3));
         Mat("TentBlue", new Color(0.2f, 0.4f, 0.8f), 0f, 0f, "Fabric", new Vector2(3, 3));
+        var padGlow = Mat("JumpPadGlow", new Color(0.25f, 0.9f, 1f), 0.6f, 0f, null, Vector2.one);
+        padGlow.EnableKeyword("_EMISSION");
+        padGlow.SetColor("_EmissionColor", new Color(0.15f, 0.75f, 1f) * 1.8f);
+        EditorUtility.SetDirty(padGlow);
         Mat("TentGreen", new Color(0.3f, 0.55f, 0.25f), 0f, 0f, "Fabric", new Vector2(3, 3));
         Mat("Hay", new Color(0.86f, 0.73f, 0.42f), 0f, 0f, "Planks", new Vector2(3, 3));
         Mat("Charred", new Color(0.1f, 0.08f, 0.07f), 0f, 0f, "Bark", Vector2.one);
@@ -1221,6 +1225,13 @@ public static partial class ProjectBuilder
         BuildSemi(new Vector3(2.2f, 0f, 0f));
         BuildTownSign(new Vector3(-9.2f, 0f, -11f));
         BuildFluketownOuterRing();
+        // Jump pads: launch arcs across the neighborhood and over the houses.
+        JumpPadTo(new Vector3(0f, 0f, -29f), new Vector3(0f, 0f, 10f), 9f);         // cul-de-sac -> up the street
+        JumpPadTo(new Vector3(-73f, 0f, -28f), new Vector3(-42f, 0f, -6f), 10f);    // west ring road -> over the side houses
+        JumpPadTo(new Vector3(73f, 0f, 38f), new Vector3(44f, 0f, 46f), 10f);       // east ring road -> avenue corner
+        JumpPadTo(new Vector3(-30f, 0f, 79f), new Vector3(-34f, 0f, 46f), 10f);     // north strip -> over the north row
+        JumpPadTo(new Vector3(50f, 0f, -57f), new Vector3(30f, 0f, -30f), 8f);      // south lot -> the court
+        JumpPadTo(new Vector3(-62f, 0f, 36f), new Vector3(-73f, 0f, 70f), 8f);      // avenue -> north-west corner
         foreach (var p in new[] { new Vector3(-7.8f, 0f, 14.5f), new Vector3(7.8f, 0f, -12.5f), new Vector3(-8f, 0f, -13f), new Vector3(8f, 0f, 16f),
                                   new Vector3(-30f, 0f, 43f), new Vector3(20f, 0f, 43f), new Vector3(43f, 0f, -20f), new Vector3(-43f, 0f, 20f) })
             Cylinder(world, "TrashCan", p + Vector3.up * 0.5f, 0.32f, 1f, M("Metal"));
@@ -1348,6 +1359,45 @@ public static partial class ProjectBuilder
         BuildCar(world, "Car", new Vector3(-72f, 0f, 30f), 4f, M("CarGreen"));
         BuildCar(world, "Car", new Vector3(74f, 0f, -18f), 182f, M("CarCream"));
         BuildCar(world, "Wrecked Car", new Vector3(20f, 0f, 72.5f), 87f, M("TruckRed"), wrecked: true);
+    }
+
+    /// <summary>
+    /// A jump pad at `pos` that throws you onto `target`, peaking `apex` metres above the higher of the two
+    /// (player gravity is 20 m/s^2; horizontal speed is held in flight).
+    /// </summary>
+    static void JumpPadTo(Vector3 pos, Vector3 target, float apex)
+    {
+        const float g = 20f;
+        float top = Mathf.Max(pos.y, target.y) + apex;
+        float vy = Mathf.Sqrt(2f * g * (top - pos.y));
+        float tUp = vy / g, tDown = Mathf.Sqrt(2f * (top - target.y) / g);
+        Vector3 flat = new Vector3(target.x - pos.x, 0f, target.z - pos.z) / (tUp + tDown);
+        var t = new GameObject("Jump Pad").transform;
+        t.SetParent(world, false);
+        t.position = pos;
+        var pad = t.gameObject.AddComponent<JumpPad>();
+        pad.launch = flat + Vector3.up * vy;
+        Cylinder(t, "Pad Base", Vector3.up * 0.05f, 1.45f, 0.1f, M("Metal"));
+        var glow = Cylinder(t, "Pad Glow", Vector3.up * 0.11f, 1.1f, 0.04f, M("JumpPadGlow"));
+        Object.DestroyImmediate(glow.GetComponent<Collider>());
+        // Chevrons pointing where it throws you.
+        float yaw = flat.sqrMagnitude > 0.01f ? Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg : 0f;
+        for (int i = 0; i < 3; i++)
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var c = Box(t, "Chevron", Quaternion.Euler(0f, yaw, 0f) * new Vector3(side * 0.18f, 0.15f, -0.5f + i * 0.4f),
+                    new Vector3(0.12f, 0.03f, 0.5f), M("Trim"), collider: false);
+                c.transform.localRotation = Quaternion.Euler(0f, yaw - side * 40f, 0f);
+            }
+        var light = new GameObject("Pad Light").AddComponent<Light>();
+        light.transform.SetParent(t, false);
+        light.transform.localPosition = Vector3.up * 0.6f;
+        light.type = LightType.Point;
+        light.color = new Color(0.3f, 0.85f, 1f);
+        light.range = 4f;
+        light.intensity = 1.6f;
+        light.shadows = LightShadows.None;
+        pad.glow = light;
     }
 
     /// <summary>Small garden shed with an open front: cover you can duck into.</summary>

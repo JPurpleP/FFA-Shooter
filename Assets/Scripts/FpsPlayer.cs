@@ -65,7 +65,7 @@ public struct PlayerInput
     public Vector2 Move, Look;
     public bool AbsoluteLook;
     public float Yaw, Pitch;
-    public bool Sprint, Jump, JumpHeld, FireHeld, FirePressed, Aim, Reload, Interact;
+    public bool Sprint, Jump, JumpHeld, FireHeld, FirePressed, Aim, Reload, Interact, Melee;
     public float Lean; // -1 = left, +1 = right
     public bool Grapple; // fire / release the grappling hook
     public bool CrouchDown, CrouchHeld, ProneToggle; // Ctrl (slide / crouch), Z (prone)
@@ -191,7 +191,7 @@ public class FpsPlayer : NetworkBehaviour
         }
     }
     public bool IsLocalHuman => IsOwner && !botOnServer;
-    public string DisplayName => PlayerName.Value.Length > 0 ? PlayerName.Value.ToString() : $"Player {OwnerClientId}";
+    public string DisplayName => PlayerName.Value.Length > 0 ? NameFilter.Clean(PlayerName.Value.ToString()) : $"Player {OwnerClientId}";
     public Color PlayerColor => Color.HSVToRGB(NetworkObjectId * 0.618034f % 1f, 0.65f, 0.9f);
     public Inventory Inv => IsOwner ? inv : netInventory.Value;
     public WeaponDef CurrentDef => WeaponDefs.Get(Inv.Weapon(Inv.Active));
@@ -398,6 +398,7 @@ public class FpsPlayer : NetworkBehaviour
     {
         if (!IsSpawned) return;
         if (IsServer && Protected.Value && Time.time >= protectEndsAt) Protected.Value = false;
+        if (IsServer && !IsOwner) ServerCheckMovement();
         if (IsOwner) OwnerUpdate();
         else RemoteUpdate();
 
@@ -532,11 +533,15 @@ public class FpsPlayer : NetworkBehaviour
                 }
                 verticalVelocity += gravity * Time.deltaTime;
                 // Leftover swing momentum bleeds off quickly on the ground, slowly in the air.
-                momentum = Vector3.MoveTowards(momentum, Vector3.zero, (controller.isGrounded ? 30f : 2.5f) * Time.deltaTime);
+                momentum = Vector3.MoveTowards(momentum, Vector3.zero, (controller.isGrounded ? 30f : padFlight ? 0f : 2.5f) * Time.deltaTime);
             }
             var flags = controller.Move((move + momentum + Vector3.up * verticalVelocity) * Time.deltaTime);
             if (Snared) EnforceTether();
             bool groundedNow = controller.isGrounded;
+            if (padFlight && groundedNow && Time.time > padLaunchTime + 0.2f) padFlight = false;
+            if (Time.time > padLaunchTime + 0.6f && !Flying)
+                foreach (var pad in JumpPad.All)
+                    if (pad.Touches(transform.position)) { LaunchFromPad(pad.launch); break; }
             if (groundedNow && !wasGroundedOwner && airVerticalSpeed < -4f)
             {
                 landAmount = Mathf.Clamp01(-airVerticalSpeed / 18f); // camera and weapon dip on landing
@@ -558,6 +563,7 @@ public class FpsPlayer : NetworkBehaviour
             InteractRpc(NearbyPickup.NetworkObjectId);
 
         UpdateWeapon(input, alive);
+        UpdateMelee(input, alive);
         UpdateGrenade(input, alive);
 
         if (IsLocalHuman)
@@ -610,6 +616,7 @@ public class FpsPlayer : NetworkBehaviour
             if (Bindings.Pressed(GameAction.Slot1)) input.SwitchTo = 0;
             if (Bindings.Pressed(GameAction.Slot2)) input.SwitchTo = 1;
             if (Bindings.Pressed(GameAction.Slot3)) input.SwitchTo = 2;
+            input.Melee = Bindings.Pressed(GameAction.Melee);
         }
         if (mouse != null)
         {
@@ -940,8 +947,11 @@ public class FpsPlayer : NetworkBehaviour
             sway = Vector2.Lerp(sway, swayTarget, 1f - Mathf.Exp(-10f * dt));
             float land = landAmount * Mathf.Sin(Mathf.Clamp01((Time.time - landTime) / 0.38f) * Mathf.PI);
             pos += new Vector3(sway.x * 0.004f, -sway.y * 0.003f - land * 0.05f, 0f) * free;
+            float swing = Mathf.Sin(MeleeSwing * Mathf.PI) * (MeleeSwing < 1f ? 1f : 0f);
+            pos += new Vector3(-0.06f, 0.05f, 0.16f) * swing;
             weaponRig.localPosition = pos;
-            weaponRig.localRotation = Quaternion.Euler(-24f * breakTilt, -10f * breakTilt, 14f * breakTilt)
+            weaponRig.localRotation = Quaternion.Euler(-30f * swing, 25f * swing, -20f * swing)
+                                      * Quaternion.Euler(-24f * breakTilt, -10f * breakTilt, 14f * breakTilt)
                                       * Quaternion.Euler(-viewKick * d.RecoilKick * 0.6f + sway.y * free, sway.x * free, (slideT * 18f + sway.x * 1.5f) * free);
             if (weaponModel != null && weaponModel.breakAction != null) // break-action: barrels tip open to reload
                 weaponModel.breakAction.localRotation = Quaternion.Euler(reloading ? Mathf.Sin(Mathf.SmoothStep(0f, 1f, ReloadProgress) * Mathf.PI) * 32f : 0f, 0f, 0f);
@@ -1177,6 +1187,12 @@ public class FpsPlayer : NetworkBehaviour
         if (DevSettings.GodMode && !botOnServer && OwnerClientId == NetworkManager.ServerClientId && amount < 9999) return false;
         if (botOnServer && brain != null && brain.invulnerable && amount < 9999) return false;
         Health.Value = Mathf.Max(0, Health.Value - amount);
+        if (!info.Fell && !botOnServer)
+        {
+            Vector3 from = attacker != null && attacker != this ? attacker.head.position
+                : info.Explosive ? info.ExplosionCenter : info.Point - info.Direction * 3f;
+            HurtFromRpc(from);
+        }
         if (!IsDead) return false;
 
         Deaths.Value++;
@@ -1295,6 +1311,7 @@ public class FpsPlayer : NetworkBehaviour
         else
             SpawnPoint.Pick(this, out position, out spawnYaw);
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, spawnYaw, 0f));
+        ServerMovementGrace();
         TeleportRpc(position, spawnYaw);
     }
 
@@ -1302,6 +1319,7 @@ public class FpsPlayer : NetworkBehaviour
     public void ServerTeleport(Vector3 position, float newYaw)
     {
         var keep = Inv;
+        ServerMovementGrace();
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, newYaw, 0f));
         TeleportRpc(position, newYaw);
         if (keep.W1 >= 0) ServerGiveWeapon((WeaponId)keep.W1);
@@ -1552,6 +1570,7 @@ public class FpsPlayer : NetworkBehaviour
         DuelSlot.Value = 0;
         Health.Value = MaxHealth;
         if (won) ServerProtect();
+        ServerMovementGrace();
         transform.SetPositionAndRotation(position, Quaternion.Euler(0f, newYaw, 0f));
         DuelTeleportRpc(position, newYaw);
         DuelResultRpc(won);
@@ -2237,6 +2256,136 @@ public class FpsPlayer : NetworkBehaviour
         Protected.Value = true;
         protectEndsAt = Time.time + SpawnProtectSeconds;
         protectStartedLocal = Time.time;
+    }
+
+    // ------------------------------------------------------------------ quick melee
+
+    public const float MeleeReach = 2.3f, MeleeInterval = 0.75f;
+    float nextMeleeTime, serverNextMelee, meleeTime = -10f;
+    /// <summary>0..1 through the current melee swing (1 = at rest).</summary>
+    public float MeleeSwing => Mathf.Clamp01((Time.time - meleeTime) / 0.35f);
+
+    /// <summary>Owner: V (or the trigger with nothing in hand) strikes whatever is right in front of you.</summary>
+    void UpdateMelee(PlayerInput input, bool alive)
+    {
+        bool emptyHanded = !InDuel && CurrentDef == null && (input.FirePressed || input.FireHeld);
+        if (!alive || InDuel || !(input.Melee || emptyHanded) || Time.time < nextMeleeTime) return;
+        nextMeleeTime = Time.time + MeleeInterval;
+        meleeTime = Time.time;
+        reloading = false;
+        adsT = 0f;
+        audioSource.PlayOneShot(Sfx.Swing, 0.7f);
+        FpsPlayer victim = null;
+        Vector3 point = head.position + head.forward * MeleeReach;
+        float best = float.MaxValue;
+        int n = Physics.SphereCastNonAlloc(head.position, 0.3f, head.forward, hitBuffer, MeleeReach, GameAssets.ShotMask, QueryTriggerInteraction.Ignore);
+        for (int k = 0; k < n; k++)
+        {
+            var h = hitBuffer[k];
+            if (h.collider == controller || h.collider == headHitbox) continue;
+            var p = h.collider.GetComponentInParent<FpsPlayer>();
+            if (p == this) continue;
+            if (h.distance < best)
+            {
+                best = h.distance;
+                victim = p != null && !p.IsDead ? p : null;
+                point = h.distance > 0f ? h.point : h.collider.ClosestPoint(head.position);
+            }
+        }
+        MeleeRpc(victim != null ? victim.NetworkObjectId : 0UL, point);
+    }
+
+    [Rpc(SendTo.Server)]
+    void MeleeRpc(ulong victimId, Vector3 point)
+    {
+        if (IsDead || InDuel || MatchRules.IsMatchOver || Time.time < serverNextMelee) return;
+        serverNextMelee = Time.time + MeleeInterval * 0.7f;
+        Protected.Value = false;
+        FpsPlayer victim = null;
+        if (victimId != 0 && NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(victimId, out var obj))
+            victim = obj.GetComponent<FpsPlayer>();
+        bool hit = victim != null && IsEnemyOf(victim) && (victim.transform.position - transform.position).sqrMagnitude < 3.4f * 3.4f;
+        if (hit)
+        {
+            bool headHit = point.y > victim.transform.position.y + victim.controller.height * 0.8f;
+            int dmg = MatchRules.MeleeDamage(this);
+            var info = new DeathInfo
+            {
+                Point = point, Direction = head.forward, Weapon = (byte)WeaponId.Melee,
+                Part = (byte)(headHit ? BodyModel.Part.Head : BodyModel.Part.Chest), Distance = 1f,
+                Seed = Random.Range(int.MinValue, int.MaxValue),
+            };
+            bool killed = victim.TakeDamage(dmg, this, info);
+            if (!killed) victim.ServerPush(Vector3.ProjectOnPlane(head.forward, Vector3.up).normalized * 5f + Vector3.up * 1.5f);
+            HitConfirmRpc(dmg, headHit, killed, point);
+        }
+        MeleeFxRpc(hit);
+    }
+
+    [Rpc(SendTo.NotOwner)]
+    void MeleeFxRpc(bool hit)
+    {
+        meleeTime = Time.time;
+        audioSource.PlayOneShot(hit ? Sfx.Punch : Sfx.Swing, 0.8f);
+    }
+
+    // ------------------------------------------------------------------ damage direction
+
+    [Rpc(SendTo.Owner)]
+    void HurtFromRpc(Vector3 from)
+    {
+        if (IsLocalHuman) GameUI.AddDamageIndicator(from);
+    }
+
+    // ------------------------------------------------------------------ jump pads
+
+    bool padFlight;
+    float padLaunchTime = -10f;
+
+    /// <summary>Owner: thrown by a jump pad. Horizontal speed is kept until you land.</summary>
+    void LaunchFromPad(Vector3 launch)
+    {
+        padLaunchTime = Time.time;
+        padFlight = true;
+        if (sliding) EndSlide(false);
+        if (stance != Stance.Stand) TrySetStance(Stance.Stand);
+        if (grappling) ReleaseGrapple(false);
+        verticalVelocity = launch.y;
+        momentum = new Vector3(launch.x, 0f, launch.z);
+        audioSource.PlayOneShot(Sfx.GrappleFire, 0.8f);
+        PadFxRpc();
+    }
+
+    [Rpc(SendTo.NotOwner)]
+    void PadFxRpc() => audioSource.PlayOneShot(Sfx.GrappleFire, 0.8f);
+
+    // ------------------------------------------------------------------ anti-cheat (server)
+
+    // Movement is owner-authoritative, so the server sanity-checks how far each human moves: more than this in half a
+    // second (well above anything legit: sprint + speed hack + flyhack, grapple swings, pads, blasts) is a strike, and
+    // three strikes inside 30 s gets the player removed.
+    const float MaxLegitSpeed = 70f, CheckInterval = 0.5f;
+    float acNextCheck, acStrikeWindow, acGraceUntil;
+    Vector3 acLastPos;
+    int acStrikes;
+
+    /// <summary>Server: the next big move is ours (respawn, teleport, duel) - don't count it.</summary>
+    public void ServerMovementGrace() => acGraceUntil = Time.time + 2f;
+
+    void ServerCheckMovement()
+    {
+        if (Time.time < acNextCheck) return;
+        acNextCheck = Time.time + CheckInterval;
+        Vector3 p = netPosition.Value;
+        float moved = (p - acLastPos).magnitude;
+        acLastPos = p;
+        if (Time.time < acGraceUntil || IsDead || InLobby.Value || InDuel || !hasNetPosition) return;
+        if (moved <= MaxLegitSpeed * CheckInterval) return;
+        if (Time.time > acStrikeWindow) { acStrikes = 0; acStrikeWindow = Time.time + 30f; }
+        acStrikes++;
+        Debug.LogWarning($"[FFA] Anti-cheat: {DisplayName} moved {moved:0.0} m in {CheckInterval} s (strike {acStrikes}/3)");
+        if (acStrikes >= 3)
+            NetworkManager.DisconnectClient(OwnerClientId, "Removed by the server: movement check failed.");
     }
 
     // ------------------------------------------------------------------ rope snare

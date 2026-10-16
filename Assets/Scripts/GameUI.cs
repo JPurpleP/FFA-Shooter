@@ -91,6 +91,64 @@ public partial class GameUI : MonoBehaviour
 
     public static void OnDevPanelToggled(bool open) => SetCursorCaptured(!open);
 
+    readonly List<(Vector3 from, float time)> damageFrom = new();
+
+    /// <summary>The local player was hurt by something at `from`: show a red arc pointing at it.</summary>
+    public static void AddDamageIndicator(Vector3 from)
+    {
+        if (instance == null) return;
+        instance.damageFrom.Add((from, Time.time));
+        if (instance.damageFrom.Count > 8) instance.damageFrom.RemoveAt(0);
+    }
+
+    void DrawDamageIndicators(FpsPlayer me, float w, float h, float t)
+    {
+        damageFrom.RemoveAll(d => t - d.time > 1.6f);
+        if (me.playerCamera == null) return;
+        var cam = me.playerCamera.transform;
+        Vector3 fwd = Vector3.ProjectOnPlane(cam.forward, Vector3.up);
+        if (fwd.sqrMagnitude < 0.001f) fwd = me.transform.forward;
+        var c = new Vector2(w / 2f, h / 2f);
+        foreach (var (from, time) in damageFrom)
+        {
+            Vector3 to = Vector3.ProjectOnPlane(from - cam.position, Vector3.up);
+            if (to.sqrMagnitude < 0.01f) continue;
+            float ang = Vector3.SignedAngle(fwd, to, Vector3.up) * Mathf.Deg2Rad;
+            float a = Mathf.Clamp01(1f - (t - time) / 1.6f);
+            var col = new Color(1f, 0.15f, 0.1f, 0.85f * a);
+            const float r = 120f, half = 0.32f;
+            for (int i = 0; i < 6; i++)
+            {
+                float a0 = ang - half + i * half / 3f, a1 = a0 + half / 3f;
+                DrawLine(c + new Vector2(Mathf.Sin(a0), -Mathf.Cos(a0)) * r, c + new Vector2(Mathf.Sin(a1), -Mathf.Cos(a1)) * r, 7f, col);
+            }
+        }
+    }
+
+    static readonly string[] CompassNames = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+
+    /// <summary>Heading strip under the match info (the maps are big now).</summary>
+    void DrawCompass(FpsPlayer me, float w)
+    {
+        const float span = 100f, width = 440f, y = 38f; // degrees shown either side, pixels
+        float cx = w / 2f, yaw = me.Yaw;
+        Fill(new Rect(cx - width / 2f, y, width, 22f), new Color(0f, 0f, 0f, 0.25f));
+        var tick = new Color(1f, 1f, 1f, 0.55f);
+        var style = new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold };
+        for (int deg = 0; deg < 360; deg += 15)
+        {
+            float d = Mathf.DeltaAngle(yaw, deg);
+            if (Mathf.Abs(d) > span) continue;
+            float x = cx + d / span * width / 2f;
+            float fade = 1f - Mathf.Abs(d) / span;
+            if (deg % 45 == 0)
+                Shadowed(new Rect(x - 20f, y + 2f, 40f, 18f), CompassNames[deg / 45], style, new Color(1f, deg == 0 ? 0.55f : 1f, deg == 0 ? 0.3f : 1f, fade));
+            else
+                Fill(new Rect(x - 0.5f, y + 7f, 1f, 8f), new Color(tick.r, tick.g, tick.b, tick.a * fade));
+        }
+        Fill(new Rect(cx - 1f, y + 20f, 2f, 6f), Accent);
+    }
+
     // ---------------------------------------------------------------- ESP (5-kill streak)
 
     readonly List<Vector3> espBones = new();
@@ -663,6 +721,8 @@ public partial class GameUI : MonoBehaviour
 
         if (me.EspActive && !me.IsDead) DrawEsp(me, w, h, scale);
         if (!me.IsDead) DrawSpawnProtection(me, w, h, scale);
+        if (!me.IsDead) DrawDamageIndicators(me, w, h, t);
+        if (!me.IsDead) DrawCompass(me, w);
 
         // Crosshair (fades out while aiming down sights) + hit marker
         float cx = w / 2, cy = h / 2;

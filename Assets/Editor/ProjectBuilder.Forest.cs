@@ -193,6 +193,13 @@ public static partial class ProjectBuilder
         Clear(-52f, 14f, 7.5f);
         var stand = BuildDeerStand(CampG(54f, 34f), 180f);
         // Two more stands out in the woods the bigger map added.
+        // Jump pads: up the ridges from the valley, and across the pond.
+        JumpPadTo(CampG(-20f, -2f, 0f), CampG(-40f, -14f, 0f), 6f);
+        JumpPadTo(CampG(22f, 22f, 0f), CampG(42f, 30f, 0f), 6f);
+        JumpPadTo(CampG(-16f, -28f, 0f), CampG(18f, -40f, 0f), 7f);
+        JumpPadTo(CampG(0f, 52f, 0f), CampG(-26f, 70f, 0f), 7f);
+        JumpPadTo(CampG(-62f, 40f, 0f), CampG(-82f, 20f, 0f), 6f);
+        JumpPadTo(CampG(64f, -20f, 0f), CampG(80f, 4f, 0f), 6f);
         BuildDeerStand(CampG(-78f, -38f), 90f);
         Clear(-78f, -38f, 4f);
         BuildDeerStand(CampG(78f, 68f), 270f);

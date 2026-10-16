@@ -167,5 +167,8 @@ public class MatchRules : MonoBehaviour
         Debug.Log("[FFA] Back to the lobby");
     }
 
+    /// <summary>Quick-melee damage (game modes may change it).</summary>
+    public static int MeleeDamage(FpsPlayer attacker) => 55;
+
     public static void ResetState() => IsMatchOver = UseLobby = LobbyOpen = false;
 }

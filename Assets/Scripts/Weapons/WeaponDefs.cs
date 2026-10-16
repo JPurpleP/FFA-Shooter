@@ -28,6 +28,7 @@ public enum WeaponId
     SmokeGrenade = 22, // throwable (slot 3): thick smoke cloud
     RopeGrenade = 23,  // throwable (slot 3): snares everyone nearby in ropes
     Molotov = 24,      // throwable (slot 3): bursts into a pool of fire on impact
+    Melee = 25,        // quick melee (gun butt / knife): never a pickup
 }
 
 /// <summary>Static stats for one weapon type. Distances in meters, angles in degrees, times in seconds.</summary>
@@ -354,6 +355,12 @@ public static class WeaponDefs
             Projectile = ProjectileKind.Molotov, IsThrowable = true, MagSize = 1, SpareMags = 0,
             OneHanded = true, HipOffset = new Vector3(0.2f, -0.24f, 0.34f), PickupGlow = new Color(1f, 0.45f, 0.1f),
             RagdollImpulse = 60f, RagdollLift = 0.2f,
+        },
+        new WeaponDef
+        {
+            Id = WeaponId.Melee, Name = "Melee", Caliber = "close quarters",
+            Damage = 55, Range = 2.3f, FireInterval = 0.75f, HipSpread = 1f, AdsSpread = 1f, BloomPerShot = 0f,
+            RagdollImpulse = 260f, RagdollLift = 0.35f, RagdollSpin = 45f, DismemberPower = 0, PickupGlow = Color.white,
         },
     };
 

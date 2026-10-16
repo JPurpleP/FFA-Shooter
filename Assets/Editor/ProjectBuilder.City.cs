@@ -65,6 +65,13 @@ public static partial class ProjectBuilder
                 if (!NearAvenue(x) && Mathf.Abs(Mathf.Abs(x) - 73f) > 6f)
                     Box(world, "LaneDash", new Vector3(x, 0.012f, z), new Vector3(2f, 0.01f, 0.15f), M("Trim"), collider: false);
         BuildCityOuterRing(rng);
+        // Jump pads: from the streets up onto shop roofs (the roofs have stairs back down), plus one across the ring.
+        JumpPadTo(new Vector3(-25f, 0f, -24.5f), new Vector3(-25f, Curb + 7.3f, -37f), 4f);   // 1st St -> Pawn Shop roof
+        JumpPadTo(new Vector3(-14.5f, 0f, 7f), new Vector3(-14.5f, Curb + 3.7f, -6.5f), 4f);  // Main St -> Diner roof
+        JumpPadTo(new Vector3(14.5f, 0f, 13f), new Vector3(14.5f, Curb + 7.3f, -6.5f), 4f);   // Main St -> Corner Store roof
+        JumpPadTo(new Vector3(-25f, 0f, 46.5f), new Vector3(-25f, Curb + 7.3f, 57.5f), 4f);   // 3rd St -> Record Store roof
+        JumpPadTo(new Vector3(-73f, 0f, -12f), new Vector3(-50f, 0f, 10f), 9f);               // west ring -> Main St
+        JumpPadTo(new Vector3(73f, 0f, 30f), new Vector3(50f, 0f, 10f), 9f);                  // east ring -> Main St
 
         // ---------------------------------------------------------------- blocks
         // Row 1 (south, along 1st St)
