@@ -198,6 +198,7 @@ public static partial class ProjectBuilder
             house.intensity = 1.1f;
             house.color = new Color(1f, 0.75f, 0.45f);
             house.shadows = LightShadows.None;
+            house.renderMode = LightRenderMode.ForceVertex;
         }
 
         var arena = a.gameObject.AddComponent<DuelArena>();

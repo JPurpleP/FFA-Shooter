@@ -30,7 +30,7 @@ road puddles, manholes, trash bags) merged into a few batched meshes per map so 
   host's **Start Match** unlocks once every player is ready. The host can also switch the map in the lobby (everyone follows). No bots in normal games (the F1 dev panel can still add them).
   Players who join mid-match drop straight in.
 - **Proximity voice chat:** players within 40 m hear you, quieter with distance and from your direction (everyone hears
-  everyone in the lobby). Push-to-talk on **C** by default (rebindable), or open mic, or off — Options → Voice also has
+  everyone in the lobby). Push-to-talk on **V** by default (rebindable), or open mic, or off — Options → Voice also has
   voice volume, mic boost, mic picker and a level meter. Mute anyone from the lobby list or Esc → Players. Built in
   (16 kHz IMA ADPCM through the host, ~64 kbit/s only while talking); no extra service to set up.
 - **Spawn protection:** for 3 s after spawning you can't be hurt (and can't be pulled into a golden duel). Moving, jumping,
@@ -73,7 +73,7 @@ and a **map vote** for the next match (host can switch voting off).
 
 ## Map extras
 - **Jump pads** (6 per map): step on one to be thrown along the chevrons (Downtown's land on shop roofs).
-- **Quick melee** (V), **compass**, and a red **damage-direction** arc around the crosshair.
+- **Quick melee** (C), **compass**, and a red **damage-direction** arc around the crosshair.
 
 ## Killstreaks
 Kills since your last death count as a streak (shown bottom-left, with the next reward). Each reward lasts 30 s.

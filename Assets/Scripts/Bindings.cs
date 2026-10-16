@@ -18,7 +18,7 @@ public static class Bindings
     {
         Key.W, Key.S, Key.A, Key.D, Key.LeftShift, Key.Space, Key.LeftCtrl, Key.Z, Key.Q, Key.E,
         Key.R, Key.F, Key.G, Key.T, Key.Digit1, Key.Digit2, Key.Digit3, Key.Tab,
-        Key.V, Key.Y, Key.B, Key.C,
+        Key.C, Key.Y, Key.B, Key.V,
     };
 
     static Key[] keys;
@@ -109,6 +109,17 @@ public static class Bindings
         {
             int saved = PlayerPrefs.GetInt("ffa.key." + All[i], -1);
             if (saved > 0 && System.Enum.IsDefined(typeof(Key), saved)) keys[i] = (Key)saved;
+        }
+        // Push to talk moved to V and melee to C: swap saved bindings that still have the old pair.
+        if (PlayerPrefs.GetInt("ffa.keys.v2", 0) == 0)
+        {
+            if (keys[(int)GameAction.Melee] == Key.V && keys[(int)GameAction.PushToTalk] == Key.C)
+            {
+                keys[(int)GameAction.Melee] = Key.C;
+                keys[(int)GameAction.PushToTalk] = Key.V;
+                Save();
+            }
+            PlayerPrefs.SetInt("ffa.keys.v2", 1);
         }
     }
 

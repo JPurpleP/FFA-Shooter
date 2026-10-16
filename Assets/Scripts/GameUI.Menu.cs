@@ -585,7 +585,7 @@ public partial class GameUI
 
         // Microphone: click to cycle through the devices.
         GUI.Label(new Rect(r.x, y, 300, 20), "MICROPHONE", smallStyle);
-        var devices = Microphone.devices;
+        var devices = VoiceChat.Devices;
         string current = string.IsNullOrEmpty(GameSettings.MicDevice) || System.Array.IndexOf(devices, GameSettings.MicDevice) < 0 ? "System default" : GameSettings.MicDevice;
         if (GUI.Button(new Rect(r.x, y + 24, r.width - 120, 36), devices.Length == 0 ? "No microphone found" : current, mapButtonStyle) && devices.Length > 0)
         {

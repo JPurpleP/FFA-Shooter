@@ -44,6 +44,27 @@ public static partial class ProjectBuilder
         Debug.Log("[FFA] Arena rebuilt");
     }
 
+    /// <summary>Development build in Builds/Profile (profiler markers + frame timing) for -ffabench runs. Doesn't rebuild the arena.</summary>
+    public static void BuildProfile()
+    {
+        PlayerSettings.enableFrameTimingStats = true;
+        bool dx11 = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ffadx11") >= 0;
+        PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, !dx11);
+        if (dx11) PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneWindows64, new[] { UnityEngine.Rendering.GraphicsDeviceType.Direct3D11 });
+        var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+        {
+            scenes = new[] { ScenePath },
+            locationPathName = "Builds/Profile/FFA-Shooter.exe",
+            target = BuildTarget.StandaloneWindows64,
+            options = BuildOptions.Development,
+        });
+        PlayerSettings.enableFrameTimingStats = false;
+        PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, true);
+        Debug.Log($"[FFA] Build result: {report.summary.result}, errors={report.summary.totalErrors}");
+        if (Application.isBatchMode)
+            EditorApplication.Exit(report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
+    }
+
     public static void BuildWindows()
     {
         RebuildAll();
@@ -1482,6 +1503,7 @@ public static partial class ProjectBuilder
         light.range = 4f;
         light.intensity = 1.6f;
         light.shadows = LightShadows.None;
+        light.renderMode = LightRenderMode.ForceVertex;
         pad.glow = light;
     }
 

@@ -51,6 +51,22 @@ public class VoiceChat : MonoBehaviour
 
     static NetworkManager Net => NetworkManager.Singleton;
 
+    static string[] devices = new string[0];
+    static float devicesAt = -100f;
+    /// <summary>Microphone names, cached (enumerating them takes milliseconds on Windows).</summary>
+    public static string[] Devices
+    {
+        get
+        {
+            if (Time.unscaledTime - devicesAt > 3f)
+            {
+                devicesAt = Time.unscaledTime;
+                devices = Microphone.devices;
+            }
+            return devices;
+        }
+    }
+
     void Update()
     {
         var net = Net;
@@ -63,7 +79,8 @@ public class VoiceChat : MonoBehaviour
         if (!online) registered = null;
 
         bool wantMic = online && GameSettings.VoiceMode != 0 && !testTone && !Application.isBatchMode;
-        if (wantMic) StartMic(); else StopMic();
+        if (wantMic) StartMic();
+        else if (openedFor != null) { StopMic(); openedFor = null; }
 
         Capture(online);
     }
@@ -72,14 +89,24 @@ public class VoiceChat : MonoBehaviour
 
     // ------------------------------------------------------------------ capture
 
+    /// <summary>The device setting the running mic was opened for ("" = system default).</summary>
+    string openedFor;
+    float nextMicCheck;
+
     void StartMic()
     {
-        string want = GameSettings.MicDevice;
-        if (mic != null && device == want && Microphone.IsRecording(device)) return;
+        // The Microphone API is slow on Windows (it enumerates devices), so only look at it now and then.
+        string want = GameSettings.MicDevice ?? "";
+        if (mic != null && openedFor == want && Time.unscaledTime < nextMicCheck) return;
+        if (mic == null && openedFor == want && Time.unscaledTime < nextMicCheck) return; // failed recently: retry later
+        nextMicCheck = Time.unscaledTime + 3f;
+        if (mic != null && openedFor == want && Microphone.IsRecording(device)) return;
         StopMic();
-        if (Microphone.devices.Length == 0) { MicError = "No microphone found"; return; }
-        if (!string.IsNullOrEmpty(want) && System.Array.IndexOf(Microphone.devices, want) < 0) want = "";
-        device = string.IsNullOrEmpty(want) ? null : want;
+        openedFor = want;
+        var devices = Devices;
+        if (devices.Length == 0) { MicError = "No microphone found"; return; }
+        if (want.Length > 0 && System.Array.IndexOf(devices, want) < 0) want = "";
+        device = want.Length == 0 ? null : want;
         mic = Microphone.Start(device, true, 1, Rate);
         readPos = 0;
         pending.Clear();

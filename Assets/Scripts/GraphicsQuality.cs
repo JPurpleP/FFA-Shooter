@@ -15,6 +15,9 @@ public static class GraphicsQuality
         QualitySettings.shadowDistance = q == 0 ? 60f : q == 1 ? 110f : 170f;
         QualitySettings.shadowCascades = q == 0 ? 2 : 4;
         QualitySettings.shadowResolution = q == 2 ? ShadowResolution.VeryHigh : ShadowResolution.High;
+        // Each per-pixel point light draws every object it touches again (forward rendering), so keep few:
+        // the extra ones (muzzle flashes, explosions) fall back to cheap per-vertex lighting.
+        QualitySettings.pixelLightCount = q == 0 ? 1 : q == 1 ? 2 : 3;
         foreach (var layer in Object.FindObjectsByType<PostProcessLayer>(FindObjectsInactive.Include))
             Configure(layer);
         // Ambient occlusion lives in the map profiles: on only at High.
