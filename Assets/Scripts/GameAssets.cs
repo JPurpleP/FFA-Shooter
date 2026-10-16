@@ -71,6 +71,9 @@ public class GameAssets : MonoBehaviour
     public static int ViewModelLayer { get; private set; }
     public static int DebrisLayer { get; private set; }
     public static int HitboxLayer { get; private set; }
+    public static int PostFxLayer { get; private set; }
+    /// <summary>Shaders and lookup textures the post-processing stack needs (assigned by the builder).</summary>
+    public UnityEngine.Rendering.PostProcessing.PostProcessResources postResources;
     /// <summary>What bullets can hit: world geometry and live players (not ragdolls, gibs or view models).</summary>
     public static int ShotMask { get; private set; }
 
@@ -105,6 +108,7 @@ public class GameAssets : MonoBehaviour
         ViewModelLayer = LayerMask.NameToLayer("ViewModel");
         DebrisLayer = LayerMask.NameToLayer("Debris");
         HitboxLayer = LayerMask.NameToLayer("Hitbox");
+        PostFxLayer = Mathf.Max(0, LayerMask.NameToLayer("PostFX"));
         if (HitboxLayer < 0) HitboxLayer = 0;
         if (PlayerLayer < 0) PlayerLayer = 0;
         if (ViewModelLayer < 0) ViewModelLayer = 0;

@@ -68,6 +68,7 @@ public static partial class ProjectBuilder
         Set(9, "ViewModel");
         Set(10, "Debris");
         Set(11, "Hitbox");
+        Set(12, "PostFX");
         tagManager.ApplyModifiedPropertiesWithoutUndo();
     }
 
@@ -732,6 +733,15 @@ public static partial class ProjectBuilder
         Mat("RoofGreen", new Color(0.3f, 0.42f, 0.3f), 0f, 0f, "Shingles", new Vector2(4, 4));
         Mat("TentOrange", new Color(0.95f, 0.5f, 0.12f), 0f, 0f, "Fabric", new Vector2(3, 3));
         Mat("TentBlue", new Color(0.2f, 0.4f, 0.8f), 0f, 0f, "Fabric", new Vector2(3, 3));
+        // Clutter and street details
+        Mat("GrassTuft", new Color(0.36f, 0.55f, 0.24f), 0f, 0f, null, Vector2.one);
+        Mat("GrassTuftDry", new Color(0.62f, 0.56f, 0.34f), 0f, 0f, null, Vector2.one);
+        Mat("Fern", new Color(0.24f, 0.42f, 0.2f), 0f, 0f, null, Vector2.one);
+        Mat("Scrub", new Color(0.46f, 0.43f, 0.3f), 0f, 0f, null, Vector2.one);
+        Mat("Tumbleweed", new Color(0.55f, 0.43f, 0.29f), 0f, 0f, "Fabric", new Vector2(3, 3));
+        Mat("Puddle", new Color(0.06f, 0.07f, 0.08f), 0.97f, 0.1f, null, Vector2.one);
+        Mat("Manhole", new Color(0.18f, 0.17f, 0.16f), 0.3f, 0.6f, "Grid", new Vector2(2, 2));
+        Mat("TrashBag", new Color(0.05f, 0.05f, 0.06f), 0.65f, 0f, null, Vector2.one);
         // Frostpeak
         Mat("Snow", new Color(0.93f, 0.95f, 0.98f), 0.12f, 0f, "Sand", Vector2.one);
         Mat("SnowRoad", new Color(0.72f, 0.7f, 0.68f), 0f, 0f, "Dirt", Vector2.one);
@@ -928,6 +938,7 @@ public static partial class ProjectBuilder
         cam.fieldOfView = FpsPlayer.BaseFov;
         cam.cullingMask = ~(1 << GameAssets.ViewModelLayer);
         cam.enabled = false;
+        AddPostLayer(cam);
         var listener = camGo.AddComponent<AudioListener>();
         listener.enabled = false;
 
@@ -988,7 +999,8 @@ public static partial class ProjectBuilder
         sun.intensity = 1.15f;
         sun.color = new Color(1f, 0.95f, 0.86f);
         sun.shadows = LightShadows.Soft;
-        sun.shadowStrength = 0.85f;
+        sun.shadowStrength = 0.9f;
+        sun.shadowNormalBias = 0.3f;
         sunGo.transform.rotation = Quaternion.Euler(48f, -40f, 0f);
         RenderSettings.sun = sun;
         RenderSettings.ambientMode = AmbientMode.Trilight;
@@ -1005,6 +1017,7 @@ public static partial class ProjectBuilder
         var menuCam = menuCamGo.AddComponent<Camera>();
         menuCam.cullingMask = ~(1 << GameAssets.ViewModelLayer);
         menuCam.farClipPlane = 1500f;
+        AddPostLayer(menuCam);
         menuCamGo.AddComponent<AudioListener>();
         var orbit = menuCamGo.AddComponent<MenuCameraOrbit>();
         orbit.radius = 95f;
@@ -1016,6 +1029,9 @@ public static partial class ProjectBuilder
         PlaceWeaponSpawners("Fluketown", 50);
         PlaceHookSpawners("Fluketown", 8);
         PlaceGrenadeSpawners("Fluketown", 16);
+        DressFluketown();
+        var skyFluke = ApplyLook("Fluketown", new Look { Temperature = 6f, Saturation = 8f, Contrast = 12f, Exposure = 0.35f, Bloom = 1.2f, Vignette = 0.22f, Ao = 0.55f,
+            Filter = Color.white, SkyTint = new Color(0.5f, 0.55f, 0.65f), SkyGround = new Color(0.4f, 0.37f, 0.34f), Atmosphere = 1f, SkyExposure = 1.3f });
         var fluketown = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, -2.5f), new Vector3(90f, 30f, 70f));
         ValidateDoorways("Fluketown");
@@ -1026,6 +1042,9 @@ public static partial class ProjectBuilder
         PlaceWeaponSpawners("Timberline", 50, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         PlaceHookSpawners("Timberline", 8, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
         PlaceGrenadeSpawners("Timberline", 16, p => p.y < WaterY + 0.3f || PondEllipse(p.x, p.z) < 1.1f);
+        DressTimberline();
+        var skyCamp = ApplyLook("Timberline", new Look { Temperature = 3f, Tint = -3f, Saturation = 6f, Contrast = 14f, Exposure = 0.35f, Bloom = 1f, Vignette = 0.25f, Ao = 0.6f,
+            Filter = Color.white, SkyTint = new Color(0.5f, 0.56f, 0.62f), SkyGround = new Color(0.36f, 0.38f, 0.32f), Atmosphere = 1.1f, SkyExposure = 1.25f });
         var camp = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, 12f), new Vector3(100f, 30f, 90f));
         ValidateDoorways("Timberline");
@@ -1036,6 +1055,9 @@ public static partial class ProjectBuilder
         PlaceWeaponSpawners("Downtown", 50);
         PlaceHookSpawners("Downtown", 8);
         PlaceGrenadeSpawners("Downtown", 16);
+        DressDowntown();
+        var skyCity = ApplyLook("Downtown", new Look { Temperature = -4f, Saturation = -4f, Contrast = 16f, Exposure = 0.3f, Bloom = 1.4f, Vignette = 0.25f, Ao = 0.65f,
+            Filter = Color.white, SkyTint = new Color(0.55f, 0.58f, 0.65f), SkyGround = new Color(0.42f, 0.42f, 0.44f), Atmosphere = 1.3f, SkyExposure = 1.2f });
         var city = world.gameObject;
         AddProbe(world, new Vector3(0f, 8f, 10f), new Vector3(140f, 40f, 115f));
         ValidateDoorways("Downtown");
@@ -1046,6 +1068,9 @@ public static partial class ProjectBuilder
         PlaceWeaponSpawners("Frostpeak", 50);
         PlaceHookSpawners("Frostpeak", 8);
         PlaceGrenadeSpawners("Frostpeak", 16);
+        DressFrostpeak();
+        var skyFrost = ApplyLook("Frostpeak", new Look { Temperature = -12f, Saturation = -8f, Contrast = 10f, Exposure = 0.45f, Bloom = 1.3f, Vignette = 0.22f, Ao = 0.5f,
+            Filter = Color.white, SkyTint = new Color(0.6f, 0.66f, 0.78f), SkyGround = new Color(0.8f, 0.82f, 0.86f), Atmosphere = 1.4f, SkyExposure = 1.2f });
         var frost = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, 14f), new Vector3(100f, 30f, 90f));
         ValidateDoorways("Frostpeak");
@@ -1056,6 +1081,9 @@ public static partial class ProjectBuilder
         PlaceWeaponSpawners("Dust Ridge", 50);
         PlaceHookSpawners("Dust Ridge", 8);
         PlaceGrenadeSpawners("Dust Ridge", 16);
+        DressDustRidge();
+        var skyDesert = ApplyLook("Dust Ridge", new Look { Temperature = 14f, Tint = 4f, Saturation = 10f, Contrast = 16f, Exposure = 0.3f, Bloom = 1.6f, Vignette = 0.28f, Ao = 0.55f,
+            Filter = Color.white, SkyTint = new Color(0.62f, 0.55f, 0.48f), SkyGround = new Color(0.6f, 0.45f, 0.3f), Atmosphere = 1.6f, SkyExposure = 1.4f });
         var desert = world.gameObject;
         AddProbe(world, new Vector3(0f, 6f, 6f), new Vector3(120f, 30f, 60f));
         ValidateDoorways("Dust Ridge");
@@ -1090,11 +1118,11 @@ public static partial class ProjectBuilder
         {
             new MapCatalog.Entry
             {
-                name = "Fluketown", description = "Suburban cul-de-sac and side streets.", root = fluketown,
+                name = "Fluketown", description = "Suburban cul-de-sac and side streets.", root = fluketown, skybox = skyFluke,
             },
             new MapCatalog.Entry
             {
-                name = "Timberline", description = "Wooded summer camp between two hills.", root = camp,
+                name = "Timberline", description = "Wooded summer camp between two hills.", root = camp, skybox = skyCamp,
                 fogColor = new Color(0.63f, 0.7f, 0.7f), fogStart = 45f, fogEnd = 290f,
                 ambientSky = new Color(0.55f, 0.65f, 0.74f), ambientEquator = new Color(0.45f, 0.5f, 0.42f), ambientGround = new Color(0.22f, 0.24f, 0.18f),
                 sunColor = new Color(1f, 0.92f, 0.78f), sunIntensity = 1.1f, sunEuler = new Vector3(40f, -60f, 0f),
@@ -1102,7 +1130,7 @@ public static partial class ProjectBuilder
             },
             new MapCatalog.Entry
             {
-                name = "Downtown", description = "City blocks, rooftops, parking garage.", root = city,
+                name = "Downtown", description = "City blocks, rooftops, parking garage.", root = city, skybox = skyCity,
                 fogColor = new Color(0.72f, 0.74f, 0.78f), fogStart = 80f, fogEnd = 450f,
                 ambientSky = new Color(0.6f, 0.65f, 0.72f), ambientEquator = new Color(0.5f, 0.5f, 0.5f), ambientGround = new Color(0.28f, 0.27f, 0.26f),
                 sunColor = new Color(1f, 0.96f, 0.9f), sunIntensity = 1.15f, sunEuler = new Vector3(52f, 28f, 0f),
@@ -1110,7 +1138,7 @@ public static partial class ProjectBuilder
             },
             new MapCatalog.Entry
             {
-                name = "Frostpeak", description = "Snowy logging camp in a mountain valley.", root = frost,
+                name = "Frostpeak", description = "Snowy logging camp in a mountain valley.", root = frost, skybox = skyFrost,
                 fogColor = new Color(0.84f, 0.88f, 0.93f), fogStart = 35f, fogEnd = 240f,
                 ambientSky = new Color(0.7f, 0.78f, 0.9f), ambientEquator = new Color(0.62f, 0.66f, 0.72f), ambientGround = new Color(0.5f, 0.52f, 0.56f),
                 sunColor = new Color(0.95f, 0.93f, 0.98f), sunIntensity = 0.95f, sunEuler = new Vector3(28f, -30f, 0f),
@@ -1118,7 +1146,7 @@ public static partial class ProjectBuilder
             },
             new MapCatalog.Entry
             {
-                name = "Dust Ridge", description = "Wild-west town among tall mesas.", root = desert,
+                name = "Dust Ridge", description = "Wild-west town among tall mesas.", root = desert, skybox = skyDesert,
                 fogColor = new Color(0.9f, 0.78f, 0.62f), fogStart = 120f, fogEnd = 560f,
                 ambientSky = new Color(0.72f, 0.7f, 0.66f), ambientEquator = new Color(0.66f, 0.55f, 0.42f), ambientGround = new Color(0.4f, 0.3f, 0.22f),
                 sunColor = new Color(1f, 0.92f, 0.78f), sunIntensity = 1.3f, sunEuler = new Vector3(56f, 120f, 0f),
@@ -1170,6 +1198,7 @@ public static partial class ProjectBuilder
         a.gore = M("Gore");
         a.bone = M("Bone");
         a.dust = M("Dust");
+        a.postResources = PostResources;
         a.bloodSplatTexture = texs["BloodSplat"];
     }
 
@@ -1370,9 +1399,9 @@ public static partial class ProjectBuilder
         int n = 0;
         foreach (float z in new[] { -46f, -24f, -2f, 20f, 42f, 64f })
         {
-            BuildHouse($"Ring House W{n}", new Vector3(-84f, 0f, z), 0f, M(sidings[n % 5]), M(roofs[n % 2]), M(cars[n % 4]),
+            BuildHouse($"Ring House W{n}", new Vector3(-82f, 0f, z), 0f, M(sidings[n % 5]), M(roofs[n % 2]), M(cars[n % 4]),
                 backyard: false, frontYard: false, drivewayLength: 2f);
-            BuildHouse($"Ring House E{n}", new Vector3(84f, 0f, -z + 20f), 180f, M(sidings[(n + 2) % 5]), M(roofs[(n + 1) % 2]), M(cars[(n + 1) % 4]),
+            BuildHouse($"Ring House E{n}", new Vector3(82f, 0f, -z + 20f), 180f, M(sidings[(n + 2) % 5]), M(roofs[(n + 1) % 2]), M(cars[(n + 1) % 4]),
                 backyard: false, frontYard: false, drivewayLength: 2f);
             n++;
         }
@@ -1399,7 +1428,7 @@ public static partial class ProjectBuilder
             Tree(new Vector3(x + R(-3f, 3f), 0f, 79.5f + R(-1.5f, 1.5f)), R(2.6f, 3.4f));
         foreach (var (x, yaw) in new[] { (-60f, 180f), (-20f, 0f), (28f, 180f), (64f, 0f) })
             Shed(new Vector3(x, 0f, 79f), yaw);
-        for (float x = -74f; x < 74f; x += 20f)
+        for (float x = -74f; x < 60f; x += 20f) // (stops short of the east ring house's door)
             Box(world, "Hedge", new Vector3(x + 6f, 0.6f, 67.2f), new Vector3(7f, 1.2f, 1f), M("Hedge"));
 
         // Trees and street furniture along the ring road.
@@ -1408,7 +1437,7 @@ public static partial class ProjectBuilder
             Tree(new Vector3(-67.5f, 0f, z), 2.8f);
             Tree(new Vector3(67.5f, 0f, z - 6f), 2.8f);
         }
-        foreach (var p in new[] { new Vector3(-77.6f, 0f, 30f), new Vector3(77.6f, 0f, -12f), new Vector3(-36f, 0f, -53.5f), new Vector3(36f, 0f, 68.6f) })
+        foreach (var p in new[] { new Vector3(-76.8f, 0f, 33.5f), new Vector3(76.8f, 0f, -12f), new Vector3(-36f, 0f, -53.5f), new Vector3(36f, 0f, 68.6f) })
             Cylinder(world, "TrashCan", p + Vector3.up * 0.5f, 0.32f, 1f, M("Metal"));
         foreach (var p in new[] { new Vector3(-77.6f, 0f, -20f), new Vector3(77.6f, 0f, 46f) })
             Cylinder(world, "Hydrant", p + Vector3.up * 0.4f, 0.15f, 0.8f, M("TruckRed"));
@@ -1471,10 +1500,17 @@ public static partial class ProjectBuilder
         Box(t, "Roof", new Vector3(0f, 2.62f, 0f), new Vector3(4.4f, 0.2f, 3.4f), M("Roof"));
     }
 
+    /// <summary>A leafy street tree (same generated mesh as Timberline's), sized by its crown radius.</summary>
     static void Tree(Vector3 pos, float crown)
     {
-        Cylinder(world, "Tree Trunk", pos + Vector3.up * 1.6f, 0.25f, 3.2f, M("Trunk"));
-        Sphere(world, "Tree Crown", pos + Vector3.up * (2.6f + crown * 0.45f), crown, M("Foliage"));
+        int v = Mathf.Abs(Mathf.RoundToInt(pos.x * 7f + pos.z * 13f)) % 2;
+        float s = crown / 2.6f;
+        var go = MeshObject(world, "Tree", LeafyMesh(v), new[] { M("Bark"), M("Leaves") }, pos,
+            Quaternion.Euler(0f, (pos.x * 37f + pos.z * 11f) % 360f, 0f), Vector3.one * s);
+        var trunk = go.AddComponent<CapsuleCollider>();
+        trunk.center = new Vector3(0f, 1.6f, 0f);
+        trunk.height = 3.2f;
+        trunk.radius = 0.3f;
     }
 
     static void BuildPlayground(Vector3 pos)

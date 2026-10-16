@@ -387,6 +387,7 @@ public class FpsPlayer : NetworkBehaviour
             audioSource.spatialBlend = 0f;
             body.ConfigureFirstPerson();
             fpArms = FirstPersonArms.Build(head, Skins.Get(skin));
+            GraphicsQuality.Apply(); // this camera's post-processing follows the Graphics setting
             if (GameUI.AutoTest) AttachTestBrain(BotMode.Fighter);
         }
         else

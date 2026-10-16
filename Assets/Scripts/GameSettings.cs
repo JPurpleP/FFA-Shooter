@@ -13,6 +13,7 @@ public static class GameSettings
     public static float GoreLevel = 2f;
     public static int Map; // map the host starts (MapCatalog index)
     public static bool VSync = true;
+    public static int Graphics = 2; // 0 low, 1 medium, 2 high (GraphicsQuality)
     public static int FragLimit = 25;
     public static bool PublicGame = true; // list hosted games in Find Game
     public static int Mode;               // MatchRules.GameMode the host last picked
@@ -30,6 +31,7 @@ public static class GameSettings
         GoreLevel = PlayerPrefs.GetFloat("ffa.gore", 2f);
         Map = Mathf.Max(0, PlayerPrefs.GetInt("ffa.map", 0));
         VSync = PlayerPrefs.GetInt("ffa.vsync", 1) != 0;
+        Graphics = Mathf.Clamp(PlayerPrefs.GetInt("ffa.graphics", 2), 0, 2);
         FragLimit = Mathf.Clamp(PlayerPrefs.GetInt("ffa.fraglimit", 25), 10, 100);
         PublicGame = PlayerPrefs.GetInt("ffa.public", 1) != 0;
         Mode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.mode", 0), 0, 4);
@@ -49,6 +51,7 @@ public static class GameSettings
         PlayerPrefs.SetFloat("ffa.gore", GoreLevel);
         PlayerPrefs.SetInt("ffa.map", Map);
         PlayerPrefs.SetInt("ffa.vsync", VSync ? 1 : 0);
+        PlayerPrefs.SetInt("ffa.graphics", Graphics);
         PlayerPrefs.SetInt("ffa.fraglimit", FragLimit);
         PlayerPrefs.SetInt("ffa.public", PublicGame ? 1 : 0);
         PlayerPrefs.SetInt("ffa.mode", Mode);

@@ -171,6 +171,7 @@ public class KillCam : MonoBehaviour
             cam.depth = victim.playerCamera.depth + 2f;
         }
         cam.cullingMask &= ~(1 << GameAssets.ViewModelLayer);
+        GraphicsQuality.AddTo(cam); // same color grading / AO as the game view
         cam.fieldOfView = GameSettings.Fov;
         cam.nearClipPlane = 0.03f;
         Transform gunT = null;

@@ -9,6 +9,10 @@ a rail line with a depot and freight cars; jump pads and a plank ramp up onto th
 Netcode for GameObjects 2.13 + Unity Transport (host/client, online through Unity Relay join codes). Everything visual (map, weapons,
 bodies, gore, sounds) is generated from code — no imported art or audio.
 
+Each map has its own look: a tinted procedural sky, color grading, bloom, vignette and ambient occlusion
+(Post Processing Stack v2), plus ground clutter (grass tufts, ferns, pebbles, snow drifts, desert scrub, tumbleweeds,
+road puddles, manholes, trash bags) merged into a few batched meshes per map so it costs almost nothing to draw.
+
 ## Play
 - Run `Builds/Windows/FFA-Shooter.exe`. Main menu: **Play** (name, Host with a map choice, Join —
   joiners load whatever map the host picked),
@@ -17,7 +21,8 @@ bodies, gore, sounds) is generated from code — no imported art or audio.
   Confederate Soldier, Redneck, Propeller Kid,
   Office Dad, Suburban Dad, Hitman, Street OG, Disco King, Ninja, Viking, Knight, Mime, Skater, Farmer, Lumberjack, Surgeon,
   Firefighter, Hazmat, WW2 German Soldier — 32 in all), **Settings** (sensitivity,
-  field of view, volume, gore level). Choices are saved between launches; your skin syncs to everyone online.
+  field of view, volume, gore level, graphics LOW / MEDIUM / HIGH — Low turns off post-processing and shortens
+  shadows, High adds ambient occlusion and the longest shadows). Choices are saved between launches; your skin syncs to everyone online.
 - **Online play.** Hosting goes through Unity Relay: the host gets a 6-letter join code (shown in the lobby, the Esc menu
   with a copy button, the HUD corner and the Tab leaderboard), friends type it into Join. No port forwarding, no IP
   addresses shared. There is no LAN / direct-IP option in the menu (direct connections remain only as command-line test flags).
@@ -168,7 +173,8 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 - `Assets/Scripts/MapCatalog.cs` – every map lives in the one scene under its own root; switches the active map,
   its lighting and the bot graph (clients follow the host via `FpsPlayer.MapId`)
 - `Assets/Editor/ProjectBuilder.Frontier.cs` – Frostpeak and Dust Ridge (height-mapped ground, logging camp, western town).
-- `Assets/Scenes/Arena.unity` is generated and **not in git**: open the project and run **FFA > Rebuild Arena** (the build
+- `Assets/Editor/ProjectBuilder.Look.cs` – per-map post-processing profiles, skies and batched ground clutter.
+- `Assets/Scenes/Arena.unity` and `Assets/Generated/` are generated and **not in git**: open the project and run **FFA > Rebuild Arena** (the build
   script does it too).
 - `Assets/Editor/ProjectBuilder.cs` – generates textures, materials, prefabs and Fluketown; `ProjectBuilder.Forest.cs`
   builds Timberline (heightmap ground mesh, generated tree/rock meshes, cabins, lookout); `ProjectBuilder.City.cs`

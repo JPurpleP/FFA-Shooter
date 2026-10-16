@@ -24,6 +24,7 @@ public class MapCatalog : MonoBehaviour
         public Vector3 sunEuler = new(48f, -40f, 0f);
         public Vector3 orbitCenter = new(0f, 2f, 10f);
         public float orbitRadius = 124f, orbitHeight = 74f;
+        public Material skybox; // procedural sky tinted for the map
     }
 
     public Entry[] maps;
@@ -78,6 +79,11 @@ public class MapCatalog : MonoBehaviour
             I.orbit.center = e.orbitCenter;
             I.orbit.radius = e.orbitRadius;
             I.orbit.height = e.orbitHeight;
+        }
+        if (e.skybox != null)
+        {
+            RenderSettings.skybox = e.skybox;
+            DynamicGI.UpdateEnvironment();
         }
         BotNav.Bounds = e.navBounds;
         BotNav.Invalidate();

@@ -209,8 +209,14 @@ public static partial class ProjectBuilder
         }
 
         // ---------------------------------------------------------------- ground
-        HeightGround("SnowGround", SnowHeight, new[] { M("Snow"), M("SnowRoad"), M("Ice") }, (x, z, h) =>
-            LakeEllipse(x, z) < 0.95f ? 2 : SegDistance(new Vector2(x, z), LoggingRoad) < 3.2f || RectWeight(x, z, -26f, 30f, -10f, 30f, 0.01f) > 0.5f ? 1 : 0);
+        HeightGround("SnowGround", SnowHeight, new[] { M("Snow"), M("SnowRoad"), M("Ice"), M("SnowRock") }, (x, z, h) =>
+        {
+            if (LakeEllipse(x, z) < 0.95f) return 2;
+            if (SegDistance(new Vector2(x, z), LoggingRoad) < 3.2f || RectWeight(x, z, -26f, 30f, -10f, 30f, 0.01f) > 0.5f) return 1;
+            // Snow doesn't stick to the steep bits: rock shows through.
+            float sx = SnowHeight(x + 1f, z) - SnowHeight(x - 1f, z), sz = SnowHeight(x, z + 1f) - SnowHeight(x, z - 1f);
+            return Mathf.Sqrt(sx * sx + sz * sz) / 2f > 0.75f ? 3 : 0;
+        });
         HeightFar("SnowFar", SnowHeight, M("Snow"));
         InvisibleWalls(80f);
 

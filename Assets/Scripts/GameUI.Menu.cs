@@ -541,6 +541,17 @@ public partial class GameUI
         if (GUI.Button(new Rect(r.x + half + 12 + half / 2f + 4, y + 24, half / 2f - 4, 36), "OFF", GameSettings.VSync ? mapButtonStyle : mapButtonActiveStyle) && GameSettings.VSync)
         { GameSettings.VSync = false; changed = true; }
         y += 76;
+        // Graphics: post-processing, ambient occlusion and shadow distance.
+        GUI.Label(new Rect(r.x, y, 300, 20), "GRAPHICS", smallStyle);
+        float gw = (r.width - 120 - 16) / 3f;
+        for (int i = 0; i < 3; i++)
+            if (GUI.Button(new Rect(r.x + i * (gw + 8), y + 24, gw, 36), GraphicsQuality.Names[i], GameSettings.Graphics == i ? mapButtonActiveStyle : mapButtonStyle) && GameSettings.Graphics != i)
+            {
+                GameSettings.Graphics = i;
+                changed = true;
+                GraphicsQuality.Apply();
+            }
+        y += 76;
         if (changed) GameSettings.Save();
         if (GUI.Button(new Rect(r.x, y + 4, 300, 44), "RESET TO DEFAULTS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
             GameSettings.ResetToDefaults();

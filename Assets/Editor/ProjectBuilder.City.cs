@@ -152,7 +152,8 @@ public static partial class ProjectBuilder
                     }
                 for (float x = bx.a + 8f; x < bx.b - 6f; x += 11f)
                     foreach (float z in new[] { bz.a + 0.7f, bz.b - 0.7f })
-                        if (z > MapMinZ + 2f && z < MapMaxZ - 2f) StreetLight(new Vector3(x, Curb, z), z < (bz.a + bz.b) / 2f ? 180f : 0f);
+                        if (z > MapMinZ + 2f && z < MapMaxZ - 2f && bz.a >= CoreMinZ && bz.b <= CoreMaxZ)
+                            StreetLight(new Vector3(x, Curb, z), z < (bz.a + bz.b) / 2f ? 180f : 0f);
             }
         foreach (var (x, z) in new[] { (-7f, -15f), (7f, 36f), (-31f, 6f), (32f, 14f), (-44f, 41f), (44f, -25f), (-7f, 50f), (31f, -16f) })
             Cylinder(world, "Hydrant", new Vector3(x, Curb + 0.4f, z), 0.15f, 0.8f, M("TruckRed"));
@@ -232,6 +233,9 @@ public static partial class ProjectBuilder
                 bool alongZ = outerX; // the long side of a side-band block runs along Z
                 float yaw = outerX ? (cx < 0f ? 0f : 180f) : (cz < 0f ? -90f : 90f);
                 float depth = (alongZ ? w : d) - 2f, length = (alongZ ? d : w) - 2f;
+                // Shops keep a 2 m alley behind them (their back doors open onto it), so they sit forward a little.
+                float shopDepth = depth - 1f;
+                Vector3 front = outerX ? new Vector3(cx < 0f ? 1f : -1f, 0f, 0f) : new Vector3(0f, 0f, cz < 0f ? 1f : -1f);
                 if (depth < 5f || length < 5f) continue;
                 // Split the block's length into buildings 9-14 m wide with 2 m gaps.
                 float start = -length / 2f;
@@ -241,7 +245,7 @@ public static partial class ProjectBuilder
                     if (bw < 6f) break;
                     float along = start + bw / 2f;
                     var pos = alongZ ? new Vector3(cx, Curb, cz + along) : new Vector3(cx + along, Curb, cz);
-                    if (k % 3 == 2 || depth < 8f)
+                    if (k % 3 == 2 || shopDepth < 8.5f)
                     {
                         // Solid building: cover and a landmark, no interior.
                         float hgt = R(7f, 16f);
@@ -250,7 +254,7 @@ public static partial class ProjectBuilder
                         Box(world, "Outer Roof", pos + Vector3.up * (hgt + 0.15f), size + new Vector3(0f, 0.3f - hgt, 0f), M("CityRoof"), collider: false);
                     }
                     else
-                        BuildShop(names[k % names.Length], pos, yaw, depth, bw, 1 + rng.Next(2), k % 2 == 0 ? "store" : "apartment",
+                        BuildShop(names[k % names.Length], pos + front * 0.5f, yaw, shopDepth, bw, 1 + rng.Next(2), k % 2 == 0 ? "store" : "apartment",
                             M("CityBrick"), M(awnings[rng.Next(awnings.Length)]));
                     k++;
                     start += bw + 2f;

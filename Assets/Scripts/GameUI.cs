@@ -384,6 +384,7 @@ public partial class GameUI : MonoBehaviour
     void Start()
     {
         Net.OnClientDisconnectCallback += OnClientDisconnect;
+        GraphicsQuality.Apply();
 
         var args = Environment.GetCommandLineArgs();
         string Arg(string flag) { int i = Array.IndexOf(args, flag); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
