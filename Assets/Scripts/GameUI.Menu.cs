@@ -140,15 +140,17 @@ public partial class GameUI
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 46, col - 36, 56), "Start an online game. You'll get a 6-letter code; friends join with it from anywhere.", bodyStyle);
         // Map choice (also switches the fly-over behind the menu).
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 110, 200, 20), "MAP", smallStyle);
-        float mapW = (col - 36 - 8 * (MapCatalog.Count - 1)) / MapCatalog.Count;
-        for (int i = 0; i < MapCatalog.Count; i++)
-            if (GUI.Button(new Rect(hostRect.x + 18 + i * (mapW + 8), hostRect.y + 132, mapW, 36), MapCatalog.NameOf(i).ToUpper(),
-                    GameSettings.Map == i ? mapButtonActiveStyle : mapButtonStyle) && GameSettings.Map != i)
-            {
-                GameSettings.Map = i;
-                GameSettings.Save();
-                MapCatalog.Apply(i);
-            }
+        // Map picker: < NAME > (there are more maps than fit as buttons).
+        int shownMap = Mathf.Clamp(GameSettings.Map, 0, MapCatalog.Count - 1);
+        void PickMap(int i)
+        {
+            GameSettings.Map = (i + MapCatalog.Count) % MapCatalog.Count;
+            GameSettings.Save();
+            MapCatalog.Apply(GameSettings.Map);
+        }
+        if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + 132, 44, 36), "<", mapButtonStyle)) PickMap(shownMap - 1);
+        GUI.Label(new Rect(hostRect.x + 66, hostRect.y + 132, col - 36 - 96, 36), MapCatalog.NameOf(shownMap).ToUpper(), new GUIStyle(mapButtonActiveStyle) { fontSize = 15 });
+        if (GUI.Button(new Rect(hostRect.x + col - 62, hostRect.y + 132, 44, 36), ">", mapButtonStyle)) PickMap(shownMap + 1);
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 170, col - 36, 22), MapCatalog.DescriptionOf(GameSettings.Map), smallStyle);
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 198, 200, 20), "VISIBILITY", smallStyle);
         float vw = (col - 36 - 8) / 2f;
@@ -304,10 +306,12 @@ public partial class GameUI
         if (isHost)
         {
             GUI.Label(new Rect(x, y + 10, 120, 20), "MAP", smallStyle);
-            float mw = (iw - 130 - 8 * (MapCatalog.Count - 1)) / MapCatalog.Count;
+            float mw = (iw - 130 - 6 * (MapCatalog.Count - 1)) / MapCatalog.Count;
+            var mapStyle = new GUIStyle(mapButtonStyle) { fontSize = 11 };
+            var mapActive = new GUIStyle(mapButtonActiveStyle) { fontSize = 11 };
             for (int i = 0; i < MapCatalog.Count; i++)
-                if (GUI.Button(new Rect(x + 130 + i * (mw + 8), y + 2, mw, 34), MapCatalog.NameOf(i).ToUpper(),
-                        MapCatalog.Current == i ? mapButtonActiveStyle : mapButtonStyle) && MapCatalog.Current != i)
+                if (GUI.Button(new Rect(x + 130 + i * (mw + 6), y + 2, mw, 34), MapCatalog.NameOf(i).ToUpper(),
+                        MapCatalog.Current == i ? mapActive : mapStyle) && MapCatalog.Current != i)
                 {
                     MatchRules.SetMap(i);
                     GameSettings.Map = i;

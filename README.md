@@ -1,13 +1,11 @@
 # FFA Shooter
 
-Online free-for-all first-person shooter with three maps of the same size (180 × 148 m). **Fluketown** is a
-Nuketown-style suburb: the original cul-de-sac block plus a north avenue, two side streets, eight more houses, a south
-park, playground, court and water tower. **Timberline** is a summer camp in a forested valley: mess hall, four cabins,
-campfire, tents, a pond with a dock, a parking lot and gate, and wooded hills along the west and east edges (fire
-lookout tower on the west ridge, ranger station and deer stand on the east one) under ~1,300 trees. **Downtown** is a
-city grid (three streets × three avenues, 16 blocks): walk-in brick shops and apartments with stairs to the roofs, office
-and hotel tower lobbies, a two-level parking garage with ramps, a construction site with a crane, a warehouse with a
-mezzanine, a gas station, a fountain plaza and a basketball court, ringed by a skyline. Unity 6000.6, Built-in render pipeline,
+Online first-person shooter with five maps of the same size (180 × 148 m). **Fluketown** is a Nuketown-style suburb
+ringed by more streets and houses. **Timberline** is a summer camp in a forested valley. **Downtown** is a city grid with
+walk-in shops, a parking garage and a construction site. **Frostpeak** is a logging camp in a snowy mountain valley
+(sawmill, bunkhouses, log piles, logging trucks, a frozen lake with ice-fishing shacks, a lookout, falling snow).
+**Dust Ridge** is a wild-west town among tall mesas (saloon, hotel, bank, sheriff, church, livery and corral, water tower,
+a rail line with a depot and freight cars; jump pads and a plank ramp up onto the mesas). Unity 6000.6, Built-in render pipeline,
 Netcode for GameObjects 2.13 + Unity Transport (host/client, online through Unity Relay join codes). Everything visual (map, weapons,
 bodies, gore, sounds) is generated from code — no imported art or audio.
 
@@ -141,7 +139,7 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   slow-motion, damage numbers, bot status labels, bot nav-graph overlay, respawn pickups, clear corpses.
 - Command line:
   ```
-  -ffamap <0-2>    host Fluketown / Timberline / Downtown (not saved)
+  -ffamap <0-4>    host Fluketown / Timberline / Downtown / Frostpeak / Dust Ridge (not saved)
   -ffastreak <n>   start with an n-kill streak   -ffaturn <deg>  swing the view   -ffahook  start with the grappling hook
   -ffabackground [-ffareturnfocus <hwnd>]   test window that never takes focus or the mouse (pair with -monitor 2)
   -ffahost | -ffarelay | -ffaclient <ip or join code>   (command-line hosts skip the lobby unless -ffalobby;
@@ -169,6 +167,9 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 - `Assets/Scripts/Dev/` – dev panel and settings
 - `Assets/Scripts/MapCatalog.cs` – every map lives in the one scene under its own root; switches the active map,
   its lighting and the bot graph (clients follow the host via `FpsPlayer.MapId`)
+- `Assets/Editor/ProjectBuilder.Frontier.cs` – Frostpeak and Dust Ridge (height-mapped ground, logging camp, western town).
+- `Assets/Scenes/Arena.unity` is generated and **not in git**: open the project and run **FFA > Rebuild Arena** (the build
+  script does it too).
 - `Assets/Editor/ProjectBuilder.cs` – generates textures, materials, prefabs and Fluketown; `ProjectBuilder.Forest.cs`
   builds Timberline (heightmap ground mesh, generated tree/rock meshes, cabins, lookout); `ProjectBuilder.City.cs`
   builds Downtown (metre-scaled facade/brick meshes via `metricTile`, walk-in shops, garage, construction site). Re-run **FFA > Rebuild Arena**

@@ -24,7 +24,7 @@ public partial class GameUI
     {
         statShots = statHits = statBestStreak = 0;
         statKillsByWeapon.Clear();
-        voteCounts = new int[3];
+        voteCounts = new int[8];
         myVote = -1;
     }
 
@@ -40,10 +40,10 @@ public partial class GameUI
 
     // ------------------------------------------------------------------ map vote (client side)
 
-    static int[] voteCounts = new int[3];
+    static int[] voteCounts = new int[8];
     static int myVote = -1;
 
-    public static void SetVoteCounts(int a, int b, int c) => voteCounts = new[] { a, b, c };
+    public static void SetVoteCounts(int a, int b, int c, int d, int e) => voteCounts = new[] { a, b, c, d, e, 0, 0, 0 };
 
     // ------------------------------------------------------------------ HUD text per mode
 
@@ -218,15 +218,18 @@ public partial class GameUI
         // Map vote and the countdown.
         float by = r.yMax - 92;
         float left = Mathf.Max(0f, MatchRules.RestartDelaySeconds - (Time.time - winnerTime));
-        bool voting = me.MapVoteOn.Value && MapCatalog.Count >= 3;
+        bool voting = me.MapVoteOn.Value && MapCatalog.Count >= 2;
         if (voting)
         {
             GUI.Label(new Rect(x, by - 24, iw, 20), "VOTE FOR THE NEXT MAP", smallStyle);
-            float mw = (iw - 16) / 3f;
-            for (int i = 0; i < 3; i++)
+            int maps = Mathf.Min(MapCatalog.Count, 5);
+            float mw = (iw - 8 * (maps - 1)) / maps;
+            var vs = new GUIStyle(mapButtonStyle) { fontSize = 12 };
+            var va = new GUIStyle(mapButtonActiveStyle) { fontSize = 12 };
+            for (int i = 0; i < maps; i++)
             {
                 string text = $"{MapCatalog.NameOf(i).ToUpper()}  ({voteCounts[i]})";
-                if (GUI.Button(new Rect(x + i * (mw + 8), by, mw, 40), text, myVote == i ? mapButtonActiveStyle : mapButtonStyle) && myVote != i)
+                if (GUI.Button(new Rect(x + i * (mw + 8), by, mw, 40), text, myVote == i ? va : vs) && myVote != i)
                 {
                     myVote = i;
                     me.CastVote(i);

@@ -1255,7 +1255,7 @@ public class FpsPlayer : NetworkBehaviour
         if (HasGrapple.Value)
         {
             HasGrapple.Value = false;
-            WeaponPickup.Spawn(WeaponId.GrappleHook, 0, 0, dropAt - transform.forward * 0.5f, null, 30f);
+            WeaponPickup.Spawn(WeaponId.GrappleHook, 0, 0, DropSpot(dropAt, 2, 3), null, 30f);
         }
         bool byOther = attacker != null && attacker != this;
         DeathRpc(info, byOther ? new FixedString32Bytes(attacker.DisplayName) : default, byOther ? attacker.NetworkObjectId : ulong.MaxValue);
@@ -1289,6 +1289,22 @@ public class FpsPlayer : NetworkBehaviour
         TakeDamage(99999, null, info); // executions don't count toward anyone's score
     }
 
+    /// <summary>
+    /// Where the `index`-th of `count` dropped items lands: spread around `at` (about 1.1 m apart, never through a
+    /// wall), then straight down onto whatever ground is below, however high up you died.
+    /// </summary>
+    Vector3 DropSpot(Vector3 at, int index, int count)
+    {
+        float ang = (index / (float)count + 0.08f) * Mathf.PI * 2f + transform.eulerAngles.y * Mathf.Deg2Rad;
+        Vector3 dir = new Vector3(Mathf.Sin(ang), 0f, Mathf.Cos(ang));
+        Vector3 from = at + Vector3.up * 0.6f;
+        float dist = 1.1f;
+        if (Physics.SphereCast(from, 0.2f, dir, out var wall, dist, 1, QueryTriggerInteraction.Ignore))
+            dist = Mathf.Max(0f, wall.distance - 0.15f);
+        Vector3 p = from + dir * dist;
+        return Physics.Raycast(p, Vector3.down, out var ground, 500f, 1, QueryTriggerInteraction.Ignore) ? ground.point : at;
+    }
+
     void DropWeapons(Vector3 at)
     {
         if (!MatchRules.PickupsAllowed) return; // modes with fixed loadouts leave nothing behind
@@ -1297,10 +1313,7 @@ public class FpsPlayer : NetworkBehaviour
         {
             int w = i.Weapon(slot);
             if (w < 0 || w == (int)WeaponId.Glock17) continue; // everyone respawns with a Glock anyway
-            Vector3 offset = transform.right * (slot == 0 ? -0.6f : 0.6f) + transform.forward * 0.3f;
-            Vector3 pos = at + offset;
-            if (Physics.Raycast(pos + Vector3.up * 1.5f, Vector3.down, out var hit, 4f, 1, QueryTriggerInteraction.Ignore))
-                pos = hit.point;
+            Vector3 pos = DropSpot(at, slot, 3);
             float life = w == (int)WeaponId.BarrettM82 ? 60f : 30f;
             WeaponPickup.Spawn((WeaponId)w, i.Mag(slot), i.Reserve(slot), pos, null, life);
         }
@@ -2448,10 +2461,10 @@ public class FpsPlayer : NetworkBehaviour
     [Rpc(SendTo.Server)]
     void VoteRpc(int map) => MatchRules.CastVote(OwnerClientId, map, this);
 
-    public void BroadcastVotes(int a, int b, int c) => VotesRpc(a, b, c);
+    public void BroadcastVotes(int a, int b, int c, int d, int e) => VotesRpc(a, b, c, d, e);
 
     [Rpc(SendTo.ClientsAndHost)]
-    void VotesRpc(int a, int b, int c) => GameUI.SetVoteCounts(a, b, c);
+    void VotesRpc(int a, int b, int c, int d, int e) => GameUI.SetVoteCounts(a, b, c, d, e);
 
     // ------------------------------------------------------------------ chat
 

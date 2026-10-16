@@ -178,9 +178,9 @@ public partial class MatchRules
     {
         if (!IsMatchOver || !mapVote || map < 0 || map >= MapCatalog.Count) return;
         votes[clientId] = map;
-        var counts = new int[3];
-        foreach (var v in votes.Values) if (v >= 0 && v < 3) counts[v]++;
-        voter.BroadcastVotes(counts[0], counts[1], counts[2]);
+        var counts = new int[5];
+        foreach (var v in votes.Values) if (v >= 0 && v < 5) counts[v]++;
+        voter.BroadcastVotes(counts[0], counts[1], counts[2], counts[3], counts[4]);
     }
 
     /// <summary>Server, back in the lobby: switch to the most-voted map (ties broken at random).</summary>

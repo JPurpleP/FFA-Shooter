@@ -732,6 +732,26 @@ public static partial class ProjectBuilder
         Mat("RoofGreen", new Color(0.3f, 0.42f, 0.3f), 0f, 0f, "Shingles", new Vector2(4, 4));
         Mat("TentOrange", new Color(0.95f, 0.5f, 0.12f), 0f, 0f, "Fabric", new Vector2(3, 3));
         Mat("TentBlue", new Color(0.2f, 0.4f, 0.8f), 0f, 0f, "Fabric", new Vector2(3, 3));
+        // Frostpeak
+        Mat("Snow", new Color(0.93f, 0.95f, 0.98f), 0.12f, 0f, "Sand", Vector2.one);
+        Mat("SnowRoad", new Color(0.72f, 0.7f, 0.68f), 0f, 0f, "Dirt", Vector2.one);
+        Mat("Ice", new Color(0.66f, 0.82f, 0.9f), 0.9f, 0f, null, Vector2.one);
+        Mat("SnowRoof", new Color(0.92f, 0.94f, 0.97f), 0.1f, 0f, "Shingles", new Vector2(4, 4));
+        Mat("SnowyNeedles", new Color(0.32f, 0.42f, 0.38f), 0f, 0f, "Grass", new Vector2(2, 2));
+        Mat("SnowRock", new Color(0.72f, 0.74f, 0.78f), 0f, 0f, "Rock", Vector2.one);
+        // Dust Ridge
+        Mat("DesertSand", new Color(0.88f, 0.72f, 0.52f), 0f, 0f, "Sand", Vector2.one);
+        Mat("TownDirt", new Color(0.7f, 0.56f, 0.4f), 0f, 0f, "Dirt", Vector2.one);
+        Mat("RedRock", new Color(0.78f, 0.46f, 0.3f), 0f, 0f, "Rock", Vector2.one);
+        Mat("WesternWood", new Color(0.62f, 0.45f, 0.3f), 0f, 0f, "Planks", new Vector2(2, 2));
+        Mat("WesternWoodDark", new Color(0.38f, 0.26f, 0.17f), 0f, 0f, "Planks", new Vector2(2, 2));
+        Mat("WesternRed", new Color(0.62f, 0.25f, 0.2f), 0f, 0f, "Planks", new Vector2(2, 2));
+        Mat("WesternBlue", new Color(0.32f, 0.42f, 0.52f), 0f, 0f, "Planks", new Vector2(2, 2));
+        Mat("WesternGreen", new Color(0.36f, 0.48f, 0.34f), 0f, 0f, "Planks", new Vector2(2, 2));
+        Mat("WesternWhite", new Color(0.88f, 0.86f, 0.8f), 0f, 0f, "Planks", new Vector2(2, 2));
+        Mat("Canvas", new Color(0.88f, 0.84f, 0.74f), 0f, 0f, "Fabric", new Vector2(2, 2));
+        Mat("Cactus", new Color(0.27f, 0.5f, 0.27f), 0f, 0f, "Grass", new Vector2(1, 3));
+        Mat("SignBoard", new Color(0.9f, 0.82f, 0.6f), 0f, 0f, "Planks", Vector2.one);
         var padGlow = Mat("JumpPadGlow", new Color(0.25f, 0.9f, 1f), 0.6f, 0f, null, Vector2.one);
         padGlow.EnableKeyword("_EMISSION");
         padGlow.SetColor("_EmissionColor", new Color(0.15f, 0.75f, 1f) * 1.8f);
@@ -1020,6 +1040,26 @@ public static partial class ProjectBuilder
         AddProbe(world, new Vector3(0f, 8f, 10f), new Vector3(140f, 40f, 115f));
         ValidateDoorways("Downtown");
         city.SetActive(false);
+
+        passages.Clear();
+        BuildFrostpeak();
+        PlaceWeaponSpawners("Frostpeak", 50);
+        PlaceHookSpawners("Frostpeak", 8);
+        PlaceGrenadeSpawners("Frostpeak", 16);
+        var frost = world.gameObject;
+        AddProbe(world, new Vector3(0f, 6f, 14f), new Vector3(100f, 30f, 90f));
+        ValidateDoorways("Frostpeak");
+        frost.SetActive(false);
+
+        passages.Clear();
+        BuildDustRidge();
+        PlaceWeaponSpawners("Dust Ridge", 50);
+        PlaceHookSpawners("Dust Ridge", 8);
+        PlaceGrenadeSpawners("Dust Ridge", 16);
+        var desert = world.gameObject;
+        AddProbe(world, new Vector3(0f, 6f, 6f), new Vector3(120f, 30f, 60f));
+        ValidateDoorways("Dust Ridge");
+        desert.SetActive(false);
         fluketown.SetActive(true);
         BuildDuelArenas();
 
@@ -1067,6 +1107,22 @@ public static partial class ProjectBuilder
                 ambientSky = new Color(0.6f, 0.65f, 0.72f), ambientEquator = new Color(0.5f, 0.5f, 0.5f), ambientGround = new Color(0.28f, 0.27f, 0.26f),
                 sunColor = new Color(1f, 0.96f, 0.9f), sunIntensity = 1.15f, sunEuler = new Vector3(52f, 28f, 0f),
                 orbitCenter = new Vector3(0f, 6f, 10f), orbitRadius = 136f, orbitHeight = 96f,
+            },
+            new MapCatalog.Entry
+            {
+                name = "Frostpeak", description = "Snowy logging camp in a mountain valley.", root = frost,
+                fogColor = new Color(0.84f, 0.88f, 0.93f), fogStart = 35f, fogEnd = 240f,
+                ambientSky = new Color(0.7f, 0.78f, 0.9f), ambientEquator = new Color(0.62f, 0.66f, 0.72f), ambientGround = new Color(0.5f, 0.52f, 0.56f),
+                sunColor = new Color(0.95f, 0.93f, 0.98f), sunIntensity = 0.95f, sunEuler = new Vector3(28f, -30f, 0f),
+                orbitCenter = new Vector3(0f, 4f, 12f), orbitRadius = 110f, orbitHeight = 62f,
+            },
+            new MapCatalog.Entry
+            {
+                name = "Dust Ridge", description = "Wild-west town among tall mesas.", root = desert,
+                fogColor = new Color(0.9f, 0.78f, 0.62f), fogStart = 120f, fogEnd = 560f,
+                ambientSky = new Color(0.72f, 0.7f, 0.66f), ambientEquator = new Color(0.66f, 0.55f, 0.42f), ambientGround = new Color(0.4f, 0.3f, 0.22f),
+                sunColor = new Color(1f, 0.92f, 0.78f), sunIntensity = 1.3f, sunEuler = new Vector3(56f, 120f, 0f),
+                orbitCenter = new Vector3(0f, 6f, 6f), orbitRadius = 118f, orbitHeight = 70f,
             },
         };
 
