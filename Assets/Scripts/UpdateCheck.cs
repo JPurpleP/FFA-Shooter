@@ -9,8 +9,9 @@ using UnityEngine.Networking;
 /// </summary>
 public class UpdateCheck : MonoBehaviour
 {
-    const string LatestApi = "https://api.github.com/repos/JPurpleP/FFA-Shooter-Beta/releases/latest";
-    public const string DownloadPage = "https://github.com/JPurpleP/FFA-Shooter-Beta/releases/latest";
+    // The release list (newest first), not /releases/latest: that one skips pre-releases.
+    const string LatestApi = "https://api.github.com/repos/JPurpleP/FFA-Shooter-Beta/releases?per_page=5";
+    public const string DownloadPage = "https://github.com/JPurpleP/FFA-Shooter-Beta/releases";
 
     /// <summary>The newer version on GitHub ("" while unknown or when this build is current).</summary>
     public static string NewerVersion { get; private set; } = "";
