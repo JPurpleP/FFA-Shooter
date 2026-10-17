@@ -447,6 +447,7 @@ public partial class GameUI : MonoBehaviour
             InspectEuler = new Vector3(ix, iy, iz);
         }
         ReloadTest = args.Contains("-ffareloadtest");
+        if (float.TryParse(Arg("-ffafov"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float tf)) GameSettings.Fov = tf; // tests (not saved)
         if (int.TryParse(Arg("-ffagraphics"), out int gfx)) { GameSettings.Graphics = Mathf.Clamp(gfx, 0, 2); GraphicsQuality.Apply(); }
         if (float.TryParse(Arg("-ffabench"), out float benchSeconds)) FrameBench.Begin(benchSeconds);
         if (float.TryParse(Arg("-ffaquitafter"), out float quitAfter))
