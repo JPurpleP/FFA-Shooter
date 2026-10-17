@@ -133,7 +133,7 @@ public class FirstPersonArms : MonoBehaviour
 
         // Wrist: a short tapered piece from the heel of the palm back to where the forearm starts.
         PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "Wrist", a.playerBody, c),
-            heel.localPosition + new Vector3(s * 0.001f, 0.004f, 0.004f), WristPoint(arm), 0.0205f);
+            HeelPoint(arm) - ForearmDir(arm) * 0.006f, WristPoint(arm), 0.0205f);
         if (arm.gloved)
         {
             Vector3 wp = WristPoint(arm);
@@ -142,7 +142,18 @@ public class FirstPersonArms : MonoBehaviour
     }
 
     /// <summary>Where the wrist meets the forearm, in hand space: behind and below the palm.</summary>
-    static Vector3 WristPoint(Arm arm) => new(arm.side * (arm.fit.W + 0.009f), -0.048f, -arm.fit.Hd - 0.04f);
+    static Vector3 WristPoint(Arm arm) => HeelPoint(arm) + ForearmDir(arm) * 0.03f;
+
+    /// <summary>Centre of the heel of the palm, in hand space (where the wrist leaves the hand).</summary>
+    static Vector3 HeelPoint(Arm arm) => new(arm.side * (arm.fit.W + 0.009f), -0.036f, -arm.fit.Hd * 0.5f - 0.004f);
+
+    /// <summary>
+    /// The way the forearm leaves the hand, in hand space, so the wrist stays nearly straight: down and back along a
+    /// pistol grip; back along the barrel and away from a fore-end held from underneath.
+    /// </summary>
+    static Vector3 ForearmDir(Arm arm) => arm.fit.Bar
+        ? new Vector3(arm.side * 0.45f, -0.8f, -0.4f).normalized
+        : new Vector3(arm.side * 0.12f, -0.62f, -0.78f).normalized;
 
     static Transform Part(Transform parent, PrimitiveType type, string name, Material mat, Color color)
     {
@@ -180,8 +191,11 @@ public class FirstPersonArms : MonoBehaviour
         arm.hand.localPosition = hand;
         arm.hand.localRotation = handRot;
         Vector3 wrist = hand + handRot * WristPoint(arm);
-        Vector3 elbow = wrist + arm.elbowOffset;
-        Vector3 dir = (elbow - wrist).normalized;
+        // The forearm carries on from the wrist (no kink), leaning only a little toward the usual elbow position so
+        // the arm still leaves the bottom of the screen.
+        Vector3 natural = handRot * ForearmDir(arm);
+        Vector3 dir = Vector3.Slerp(natural, arm.elbowOffset.normalized, 0.3f).normalized;
+        Vector3 elbow = wrist + dir * arm.elbowOffset.magnitude;
         // Forearm: slim just behind the wrist, fuller toward the elbow.
         Vector3 mid = wrist + (elbow - wrist) * 0.35f;
         PlaceCapsule(arm.forearmFront, wrist - dir * 0.004f, mid, 0.025f);
