@@ -12,7 +12,7 @@ public static class GraphicsQuality
     public static void Apply()
     {
         int q = GameSettings.Graphics;
-        QualitySettings.shadowDistance = q == 0 ? 60f : q == 1 ? 110f : 170f;
+        QualitySettings.shadowDistance = ShadowDistance;
         QualitySettings.shadowCascades = q == 0 ? 2 : 4;
         QualitySettings.shadowResolution = q == 2 ? ShadowResolution.VeryHigh : ShadowResolution.High;
         // Each per-pixel point light draws every object it touches again (forward rendering), so keep few:
@@ -24,6 +24,31 @@ public static class GraphicsQuality
         foreach (var volume in Object.FindObjectsByType<PostProcessVolume>(FindObjectsInactive.Include))
             if (volume.sharedProfile != null && volume.sharedProfile.TryGetSettings<AmbientOcclusion>(out var ao))
                 ao.active = q >= 2;
+    }
+
+    public static float ShadowDistance => GameSettings.Graphics == 0 ? 60f : GameSettings.Graphics == 1 ? 110f : 170f;
+    /// <summary>How much rain / snow the storms spawn: lighter on Low and Medium.</summary>
+    public static float StormParticles => GameSettings.Graphics == 0 ? 0.35f : GameSettings.Graphics == 1 ? 0.65f : 1f;
+
+    static Camera clippedCam;
+    static float clippedFar = -1f;
+
+    /// <summary>
+    /// During a storm the fog hides everything past its end, so stop drawing (and shadowing) what can't be seen:
+    /// the shadow distance and the local camera's far plane come in to just past the fog. strength 0 puts them back.
+    /// </summary>
+    public static void StormVisibility(float strength)
+    {
+        float fogEnd = RenderSettings.fogEndDistance;
+        QualitySettings.shadowDistance = strength > 0f ? Mathf.Min(ShadowDistance, fogEnd + 5f) : ShadowDistance;
+        var cam = FpsPlayer.Local != null ? FpsPlayer.Local.playerCamera : null;
+        if (cam != clippedCam)
+        {
+            if (clippedCam != null && clippedFar > 0f) clippedCam.farClipPlane = clippedFar;
+            clippedCam = cam;
+            clippedFar = cam != null ? cam.farClipPlane : -1f;
+        }
+        if (cam != null) cam.farClipPlane = strength > 0f ? Mathf.Min(clippedFar, fogEnd * 1.1f + 10f) : clippedFar;
     }
 
     /// <summary>Give a camera the shared post-processing setup (killcam cameras are made at runtime).</summary>

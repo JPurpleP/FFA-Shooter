@@ -44,7 +44,7 @@ public class Blizzard : MonoBehaviour
         gusts.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         var main = gusts.main;
         main.loop = true;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(1.6f, 2.6f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.4f, 2.2f);
         main.startSpeed = 0f;
         main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.075f);
         main.startColor = new Color(1f, 1f, 1f, 0.85f);
@@ -52,17 +52,13 @@ public class Blizzard : MonoBehaviour
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         var shape = gusts.shape;
         shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale = new Vector3(32f, 14f, 32f);
+        shape.scale = new Vector3(26f, 12f, 26f);
         var vel = gusts.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
         vel.x = new ParticleSystem.MinMaxCurve(9f, 15f);
         vel.y = new ParticleSystem.MinMaxCurve(-4f, -2f);
         vel.z = new ParticleSystem.MinMaxCurve(1f, 4f);
-        var noise = gusts.noise;
-        noise.enabled = true;
-        noise.strength = 1.2f;
-        noise.frequency = 0.6f;
         var em = gusts.emission;
         em.rateOverTime = 0f;
         var r = go.GetComponent<ParticleSystemRenderer>();
@@ -119,6 +115,7 @@ public class Blizzard : MonoBehaviour
         if (wind != null) wind.Stop();
         RestoreSky();
         sky = null;
+        GraphicsQuality.StormVisibility(0f);
         if (gusts != null) gusts.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         applied = false; // the next map sets its own fog and light
     }
@@ -143,22 +140,25 @@ public class Blizzard : MonoBehaviour
         if (MapCatalog.I.sun != null) MapCatalog.I.sun.intensity = Mathf.Lerp(map.sunIntensity, map.sunIntensity * 0.45f, k);
 
         TintSky(k);
+        GraphicsQuality.StormVisibility(k);
         if (gusts != null)
         {
             var cam = FpsPlayer.Local != null && FpsPlayer.Local.playerCamera != null && FpsPlayer.Local.playerCamera.enabled
                 ? FpsPlayer.Local.playerCamera : Camera.main;
             if (cam != null) gusts.transform.position = cam.transform.position + Vector3.left * 8f; // a little upwind
             var gem = gusts.emission;
-            gem.rateOverTime = 7000f * k;
+            gem.rateOverTime = 7000f * k * GraphicsQuality.StormParticles;
+            var gmain = gusts.main;
+            gmain.maxParticles = Mathf.RoundToInt(16000 * GraphicsQuality.StormParticles);
             if (k > 0f && !gusts.isPlaying) gusts.Play();
             if (k <= 0f && gusts.isPlaying) gusts.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         }
         if (snow != null)
         {
             var em = snow.emission;
-            em.rateOverTime = Mathf.Lerp(baseEmission, baseEmission * 9f, k);
+            em.rateOverTime = baseEmission;
             var main = snow.main;
-            main.maxParticles = k > 0f ? 16000 : 4000;
+
             var vel = snow.velocityOverLifetime;
             vel.enabled = k > 0f;
             vel.space = ParticleSystemSimulationSpace.World;

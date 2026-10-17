@@ -44,7 +44,7 @@ public class Thunderstorm : MonoBehaviour
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         var shape = rain.shape;
         shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale = new Vector3(34f, 1f, 34f);
+        shape.scale = new Vector3(28f, 1f, 28f);
         var vel = rain.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
@@ -87,6 +87,7 @@ public class Thunderstorm : MonoBehaviour
         if (rain != null) rain.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         if (rainLoop != null) rainLoop.Stop();
         applied = false;
+        GraphicsQuality.StormVisibility(0f);
     }
 
     void Update()
@@ -152,7 +153,10 @@ public class Thunderstorm : MonoBehaviour
             ? FpsPlayer.Local.playerCamera : Camera.main;
         if (cam != null) rain.transform.position = cam.transform.position + Vector3.up * 14f;
         var em = rain.emission;
-        em.rateOverTime = 15000f * k;
+        em.rateOverTime = 15000f * k * GraphicsQuality.StormParticles;
+        var rmain = rain.main;
+        rmain.maxParticles = Mathf.RoundToInt(20000 * GraphicsQuality.StormParticles);
+        GraphicsQuality.StormVisibility(k);
         if (k > 0f && !rain.isPlaying) rain.Play();
         if (k <= 0f && rain.isPlaying) rain.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         if (k > 0f && !rainLoop.isPlaying) rainLoop.Play();
