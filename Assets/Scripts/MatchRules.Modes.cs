@@ -32,9 +32,13 @@ public partial class MatchRules
         ? (team == Infected ? "INFECTED" : "SURVIVORS")
         : team == TeamRed ? "RED TEAM" : team == TeamBlue ? "BLUE TEAM" : "";
 
-    public static Color TeamColor(byte team) => Mode == GameMode.Infection
-        ? (team == Infected ? new Color(0.45f, 0.95f, 0.3f) : new Color(0.95f, 0.95f, 0.95f))
-        : team == TeamRed ? new Color(1f, 0.3f, 0.25f) : team == TeamBlue ? new Color(0.3f, 0.55f, 1f) : Color.white;
+    public static Color TeamColor(byte team) => GameUI.Accessible(Mode == GameMode.Infection
+        ? (team == Infected ? InfectedColorRaw : new Color(0.95f, 0.95f, 0.95f))
+        : TeamColorRaw(team));
+
+    /// <summary>Team colors before the colorblind setting is applied.</summary>
+    public static Color TeamColorRaw(byte team) => team == TeamRed ? new Color(1f, 0.3f, 0.25f) : team == TeamBlue ? new Color(0.3f, 0.55f, 1f) : Color.white;
+    public static readonly Color InfectedColorRaw = new(0.45f, 0.95f, 0.3f);
 
     public static int TeamKills(byte team) => FpsPlayer.All.Where(p => p.IsSpawned && p.Team.Value == team).Sum(p => p.Kills.Value);
     static int CountTeam(byte team) => FpsPlayer.All.Count(p => p.IsSpawned && p.Team.Value == team);

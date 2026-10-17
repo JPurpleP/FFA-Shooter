@@ -377,7 +377,62 @@ public static partial class ProjectBuilder
         var pr = snowGo.GetComponent<ParticleSystemRenderer>();
         pr.sharedMaterial = M("Dust");
         pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        snowGo.AddComponent<Blizzard>().snow = ps; // a storm every few minutes
         Debug.Log("[FFA] Frostpeak built");
+    }
+
+    /// <summary>
+    /// The freight train that runs the Dust Ridge main line (TrainRunner moves it): a locomotive, two flatcars with
+    /// crates to ride behind and a boxcar. Built facing -X; it turns round to run east.
+    /// </summary>
+    static void BuildTrain(float trackZ)
+    {
+        var train = new GameObject("Freight Train").transform;
+        train.SetParent(world, false);
+        train.position = new Vector3(0f, -200f, trackZ);
+        var body = train.gameObject.AddComponent<Rigidbody>();
+        body.isKinematic = true; // moving colliders want a kinematic body
+        train.gameObject.AddComponent<TrainRunner>().trackZ = trackZ;
+
+        Transform Car(string name, float x)
+        {
+            var car = new GameObject(name).transform;
+            car.SetParent(train, false);
+            car.localPosition = new Vector3(x, 0f, 0f);
+            foreach (float wx in new[] { -3.5f, 3.5f })
+                foreach (float wz in new[] { -0.75f, 0.75f })
+                {
+                    var wheel = Cylinder(car, "Wheel", new Vector3(wx, 0.5f, wz), 0.5f, 0.1f, M("Metal"));
+                    wheel.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    Object.DestroyImmediate(wheel.GetComponent<Collider>());
+                }
+            return car;
+        }
+
+        var loco = Car("Locomotive", 0f);
+        var boiler = Cylinder(loco, "Boiler", new Vector3(-1f, 1.9f, 0f), 1f, 7f, M("GunDark"));
+        boiler.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+        Box(loco, "Cab", new Vector3(3.6f, 2.2f, 0f), new Vector3(2.6f, 2.8f, 2.6f), M("WesternRed"));
+        Box(loco, "Cab Roof", new Vector3(3.6f, 3.7f, 0f), new Vector3(3f, 0.15f, 3f), M("GunDark"));
+        Cylinder(loco, "Stack", new Vector3(-3.6f, 3.3f, 0f), 0.35f, 1.4f, M("GunDark"));
+        Box(loco, "Footplate", new Vector3(0f, 0.95f, 0f), new Vector3(9.6f, 0.2f, 2.7f), M("GunDark"));
+        Box(loco, "Cowcatcher", new Vector3(-5.1f, 0.55f, 0f), new Vector3(0.9f, 0.7f, 2.5f), M("WesternRed"), zRot: 30f);
+        Box(loco, "Headlamp", new Vector3(-4.7f, 2.5f, 0f), new Vector3(0.4f, 0.5f, 0.5f), M("Trim"), collider: false);
+
+        foreach (float x in new[] { 11f, 33.6f })
+        {
+            var flat = Car("Flatcar", x);
+            Box(flat, "Deck", new Vector3(0f, 1.25f, 0f), new Vector3(10f, 0.3f, 2.7f), M("WesternWood"));
+            Box(flat, "Crate", new Vector3(-2.6f, 2.1f, 0.3f), new Vector3(1.4f, 1.4f, 1.4f), M("WesternWoodDark"));
+            Box(flat, "Crate", new Vector3(2.4f, 2.0f, -0.4f), new Vector3(1.2f, 1.2f, 1.2f), M("WesternWoodDark"), yRot: 20f);
+            Box(flat, "Crate", new Vector3(2.4f, 3.0f, -0.4f), new Vector3(0.8f, 0.8f, 0.8f), M("WesternWood"), yRot: 35f);
+        }
+        var box = Car("Boxcar", 22.3f);
+        Box(box, "Boxcar", new Vector3(0f, 2.1f, 0f), new Vector3(9.5f, 2.9f, 2.7f), M("WesternGreen"));
+        Box(box, "Roof Walk", new Vector3(0f, 3.6f, 0f), new Vector3(9.5f, 0.1f, 0.6f), M("WesternWoodDark"));
+
+        // It moves: nothing on it can be static-batched.
+        foreach (var t in train.GetComponentsInChildren<Transform>(true)) t.gameObject.isStatic = false;
     }
 
     /// <summary>Open-sided sawmill: roof on posts, a saw bench, a log deck and stacks of sawn boards.</summary>
@@ -424,14 +479,15 @@ public static partial class ProjectBuilder
     {
         float h = (Mathf.PerlinNoise(x * 0.02f + 3f, z * 0.02f + 9f) - 0.5f) * 1.8f + (Mathf.PerlinNoise(x * 0.08f, z * 0.08f) - 0.5f) * 0.4f;
         // The town and the rail line sit on level ground.
-        h = Mathf.Lerp(h, 0f, Mathf.Max(RectWeight(x, z, -56f, 56f, -16f, 30f, 8f), RectWeight(x, z, -100f, 100f, RailZ - 4f, RailZ + 4f, 5f)));
+        float rail = Mathf.Max(RectWeight(x, z, -260f, 260f, RailZ - 4f, RailZ + 4f, 5f), RectWeight(x, z, -10f, 52f, RailZ - 4f, RailZ + 7.5f, 4f));
+        h = Mathf.Lerp(h, 0f, Mathf.Max(RectWeight(x, z, -56f, 56f, -16f, 30f, 8f), rail));
         for (int i = 0; i < Mesas.Length; i++)
         {
             float w = MesaWeight(x, z, i, out float top);
             if (w > 0f) h = Mathf.Lerp(h, Mathf.Max(h, top), w);
         }
         // Beyond the boundary: tall terraced plateaus.
-        float rise = OutsideRise(x, z, 1.3f, 30f, 60f);
+        float rise = OutsideRise(x, z, 1.3f, 30f, 60f) * (1f - RectWeight(x, z, -400f, 400f, RailZ - 4.5f, RailZ + 4.5f, 7f)); // the line runs out through a cutting
         if (rise > 0f) h += Mathf.Round(rise / 9f) * 9f * 0.7f + rise * 0.3f;
         return h;
     }
@@ -513,34 +569,36 @@ public static partial class ProjectBuilder
         Occupy(48f, -13f, 8f);
 
         // ---------------------------------------------------------------- the railroad (south edge)
-        Box(world, "Rail Bed", new Vector3(0f, 0.05f, RailZ), new Vector3(MapMaxX - MapMinX, 0.1f, 3.2f), M("TownDirt"));
+        // Main line (the train runs it, out past both edges of the map) and a siding where the boxcars are parked.
+        Box(world, "Rail Bed", new Vector3(0f, 0.05f, RailZ), new Vector3(400f, 0.1f, 3.2f), M("TownDirt"));
         foreach (float off in new[] { -0.72f, 0.72f })
-            Box(world, "Rail", new Vector3(0f, 0.2f, RailZ + off), new Vector3(MapMaxX - MapMinX, 0.12f, 0.08f), M("Metal"), collider: false);
-        for (float x = MapMinX + 1f; x < MapMaxX; x += 1.2f)
+            Box(world, "Rail", new Vector3(0f, 0.2f, RailZ + off), new Vector3(400f, 0.12f, 0.08f), M("Metal"), collider: false);
+        for (float x = -150f; x < 150f; x += 1.2f)
             Box(world, "Tie", new Vector3(x, 0.12f, RailZ), new Vector3(0.25f, 0.1f, 2.4f), M("WesternWoodDark"), collider: false);
+        const float SidingZ = RailZ + 4.6f;
+        Box(world, "Siding Bed", new Vector3(22f, 0.05f, SidingZ), new Vector3(48f, 0.1f, 3.2f), M("TownDirt"));
+        foreach (float off in new[] { -0.72f, 0.72f })
+            Box(world, "Rail", new Vector3(22f, 0.2f, SidingZ + off), new Vector3(48f, 0.12f, 0.08f), M("Metal"), collider: false);
+        for (float x = -1.5f; x < 46f; x += 1.2f)
+            Box(world, "Tie", new Vector3(x, 0.12f, SidingZ), new Vector3(0.25f, 0.1f, 2.4f), M("WesternWoodDark"), collider: false);
+        Box(world, "Buffer Stop", new Vector3(46.4f, 0.6f, SidingZ), new Vector3(0.5f, 1.2f, 2.4f), M("WesternRed"));
         Box(world, "Platform", new Vector3(-20f, 0.5f, RailZ + 3.6f), new Vector3(20f, 1f, 3.6f), M("WesternWood"));
         BuildCabin("Depot", new Vector3(-20f, 0f, RailZ + 9.6f), -90f, 6f, 10f, 3.2f, M("WesternWood"), M("Roof"), backDoor: false, bunks: false);
         Occupy(-20f, RailZ + 8f, 8f);
-        foreach (var (x, kind) in new[] { (8f, 0), (21f, 1), (34f, 1), (-48f, 2) })
+        foreach (var (x, kind) in new[] { (8f, 0), (21f, 1), (34f, 1) })
         {
-            var car = Building(kind == 2 ? "Locomotive" : "Freight Car", new Vector3(x, 0f, RailZ), 0f);
+            var car = Building("Freight Car", new Vector3(x, 0f, SidingZ), 0f);
             foreach (float wx in new[] { -3.5f, 3.5f })
                 foreach (float wz in new[] { -0.75f, 0.75f })
                 {
                     var wheel = Cylinder(car, "Wheel", new Vector3(wx, 0.5f, wz), 0.5f, 0.1f, M("Metal"));
                     wheel.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 }
-            if (kind == 2)
-            {
-                var boiler = Cylinder(car, "Boiler", new Vector3(-1f, 1.9f, 0f), 1f, 7f, M("GunDark"));
-                boiler.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-                Box(car, "Cab", new Vector3(3.6f, 2.2f, 0f), new Vector3(2.6f, 2.8f, 2.6f), M("WesternRed"));
-                Cylinder(car, "Stack", new Vector3(-3.6f, 3.3f, 0f), 0.35f, 1.4f, M("GunDark"));
-            }
-            else
-                Box(car, "Boxcar", new Vector3(0f, 2.1f, 0f), new Vector3(9.5f, 2.9f, 2.7f), M(kind == 0 ? "WesternRed" : "WesternWood"));
-            Occupy(x, RailZ, 6f);
+            Box(car, "Boxcar", new Vector3(0f, 2.1f, 0f), new Vector3(9.5f, 2.9f, 2.7f), M(kind == 0 ? "WesternRed" : "WesternWood"));
+            Occupy(x, SidingZ, 6f);
         }
+        Occupy(-20f, RailZ, 3f);
+        BuildTrain(RailZ);
 
         // ---------------------------------------------------------------- mesas: pads up, one ramp
         foreach (int i in new[] { 0, 1, 2, 3, 4 })
@@ -588,7 +646,7 @@ public static partial class ProjectBuilder
         {
             new Vector2(-50f, 6f), new Vector2(-30f, 6f), new Vector2(0f, 6f), new Vector2(26f, 6f), new Vector2(52f, 8f), new Vector2(-2f, 24f),
             new Vector2(-40f, 34f), new Vector2(-30f, 66f), new Vector2(20f, 60f), new Vector2(40f, 34f), new Vector2(80f, 30f), new Vector2(80f, -10f),
-            new Vector2(76f, -58f), new Vector2(40f, -60f), new Vector2(-2f, -52f), new Vector2(-34f, -50f), new Vector2(-78f, -56f), new Vector2(-80f, -12f),
+            new Vector2(76f, -51f), new Vector2(54f, -51f), new Vector2(-2f, -51f), new Vector2(-34f, -50f), new Vector2(-78f, -56f), new Vector2(-80f, -12f),
             new Vector2(-80f, 22f), new Vector2(-84f, 76f), new Vector2(30f, 78f), new Vector2(84f, 80f), new Vector2(10f, -30f), new Vector2(-34f, -24f),
         });
         Debug.Log("[FFA] Dust Ridge built");

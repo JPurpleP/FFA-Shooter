@@ -29,6 +29,19 @@ road puddles, manholes, trash bags) merged into a few batched meshes per map so 
 - **Lobby.** Hosting or joining puts you in a waiting lobby (player list, join code). Everyone presses **Ready Up**; the
   host's **Start Match** unlocks once every player is ready. The host can also switch the map in the lobby (everyone follows). No bots in normal games (the F1 dev panel can still add them).
   Players who join mid-match drop straight in.
+- **Practice vs bots** (main menu): an offline match on any map and mode, 1-11 bots, Easy / Normal / Hard, your own
+  score to win. Nothing goes online; it's the same match flow as a hosted game (summary, map vote).
+- **Version check:** the main menu shows a banner with a download button when a newer beta is out, and a game only lets
+  in players on the same version (others are told to update instead of joining a desynced game).
+- **Controller support** (Xbox / PlayStation / any gamepad): left stick move (click sprint), right stick look (click melee),
+  RT fire, LT aim, A jump, B crouch / slide, X reload or pick up, Y next weapon, RB hold to throw, LB hook, D-pad up grenades,
+  down prone, right push to talk, View scores, Menu pause. In menus the left stick moves the pointer, A clicks, B backs out.
+  Controller look sensitivity and aim assist (slower look while on an enemy) are under Options > Controls.
+- **Crosshair and colorblind options** (Options > HUD): cross / cross + dot / dot / circle, six colors, size, thickness,
+  outline, live preview; colorblind mode (red-green or blue-yellow) swaps team, Infection and health-bar colors.
+- **Spectating:** out of lives (Gun Game rounds, One in the Chamber, Infection), you watch the players still in it through
+  their eyes with their gun (aiming down sights when they do) or from a chase camera. Click / right-click (LB / RB) to switch
+  player, jump (Y) to switch view.
 - **Proximity voice chat:** players within 40 m hear you, quieter with distance and from your direction (everyone hears
   everyone in the lobby). Push-to-talk on **V** by default (rebindable), or open mic, or off — Options → Voice also has
   voice volume, mic boost, mic picker and a level meter. Mute anyone from the lobby list or Esc → Players. Built in
@@ -73,6 +86,11 @@ and a **map vote** for the next match (host can switch voting off).
 
 ## Map extras
 - **Jump pads** (6 per map): step on one to be thrown along the chevrons (Downtown's land on shop roofs).
+- **Dust Ridge train:** a freight train runs the south line every 2 minutes (first pass ~45 s in), alternating direction,
+  out through a cutting in the hills. Horn on approach and a warning for anyone near the tracks. Ride the flatcars (crates for
+  cover); stand in its way and it kills you. Its position comes from the shared server clock, so it costs no bandwidth.
+- **Frostpeak blizzard:** every 3.5 minutes (first at ~2 min in) a storm blows through for about a minute: fog down to
+  ~45 m, heavy sideways snow, dimmer sun, howling wind.
 - **Quick melee** (C), **compass**, and a red **damage-direction** arc around the crosshair.
 
 ## Killstreaks
@@ -146,6 +164,9 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 - **F1 dev panel** (host; only in the editor, development builds, or with `-ffadev`): spawn bots (Dummy / Strafer / Turret / Fighter), bot accuracy, give weapons, god mode, infinite ammo,
   **gore lab** (spawn a dummy in front of you and execute it with any weapon/body part, or auto-cycle), gore multiplier,
   slow-motion, damage numbers, bot status labels, bot nav-graph overlay, respawn pickups, clear corpses.
+- `-ffapractice` starts a practice match straight away; `-ffaversion <v>` pretends to be another version (refusal test); `-ffablizzard` forces the Frostpeak storm on;
+  `-ffaoptionstab <0-4>` / `-ffamenutab <0-5>` open a menu tab for screenshots; `-ffabench <s>` logs FPS / 1% lows /
+  SetPass / GC (dev builds: profiler markers too; `ProjectBuilder.BuildProfile` makes one in Builds/Profile).
 - Command line:
   ```
   -ffamap <0-4>    host Fluketown / Timberline / Downtown / Frostpeak / Dust Ridge (not saved)
@@ -177,6 +198,10 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
 - `Assets/Scripts/MapCatalog.cs` – every map lives in the one scene under its own root; switches the active map,
   its lighting and the bot graph (clients follow the host via `FpsPlayer.MapId`)
 - `Assets/Editor/ProjectBuilder.Frontier.cs` – Frostpeak and Dust Ridge (height-mapped ground, logging camp, western town).
+- `Assets/Scripts/Bodies/HandFit.cs` – fits the first-person hands to each gun by measuring its parts (grip size and
+  rake, fore-end cross-section, foregrips, pumps, break-action barrels); `FirstPersonArms` builds the hand to that size.
+  Check with `-ffagive <id> -ffainspect <x> <y> <z>` (the gun turned in front of the camera).
+- `Assets/Scripts/MapEvents/` – `TrainRunner` (Dust Ridge train) and `Blizzard` (Frostpeak storm), both on the server clock.
 - `Assets/Editor/ProjectBuilder.Look.cs` – per-map post-processing profiles, skies and batched ground clutter.
 - `Assets/Scenes/Arena.unity` and `Assets/Generated/` are generated and **not in git**: open the project and run **FFA > Rebuild Arena** (the build
   script does it too).

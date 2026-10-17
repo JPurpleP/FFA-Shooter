@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>Main menu: Play (host / join), Customize (skins with a live 3D preview), Settings.</summary>
 public partial class GameUI
 {
-    enum MenuTab { Play, FindGame, Leaderboard, Customize, Settings }
+    enum MenuTab { Play, Practice, FindGame, Leaderboard, Customize, Settings }
 
     static readonly Color Accent = new(1f, 0.55f, 0.15f);
     MenuTab tab = MenuTab.Play;
@@ -87,7 +87,8 @@ public partial class GameUI
         GUI.Label(new Rect(50, 116, 340, 24), $"{MapCatalog.NameOf(MapCatalog.Current).ToUpper()}  ·  FREE FOR ALL", subtitleStyle);
 
         float y = 196;
-        Nav(ref y, "PLAY", MenuTab.Play);
+        Nav(ref y, "PLAY ONLINE", MenuTab.Play);
+        Nav(ref y, "PRACTICE VS BOTS", MenuTab.Practice);
         Nav(ref y, "FIND A GAME", MenuTab.FindGame);
         Nav(ref y, "LEADERBOARD", MenuTab.Leaderboard);
         Nav(ref y, "CUSTOMIZE", MenuTab.Customize);
@@ -105,12 +106,79 @@ public partial class GameUI
         switch (tab)
         {
             case MenuTab.Play: DrawPlayTab(inner); break;
+            case MenuTab.Practice: DrawPracticeTab(inner); break;
             case MenuTab.FindGame: DrawFindGameTab(inner); break;
             case MenuTab.Leaderboard: DrawLeaderboardTab(inner); break;
             case MenuTab.Customize: DrawCustomizeTab(inner); break;
             case MenuTab.Settings: DrawSettingsTab(inner); break;
         }
         GUI.Label(new Rect(w - 260, h - 30, 250, 22), $"PUBLIC BETA  ·  v{Application.version}", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleRight });
+
+        // A newer beta is out: say so above the panel, with a download button.
+        if (UpdateCheck.NewerVersion != "")
+        {
+            var bar = new Rect(panel.x, 24, panel.width, 46);
+            Fill(bar, new Color(Accent.r, Accent.g, Accent.b, 0.9f));
+            GUI.Label(new Rect(bar.x + 18, bar.y, bar.width - 200, bar.height),
+                $"<b>UPDATE AVAILABLE</b>  ·  v{UpdateCheck.NewerVersion} is out (you have v{Application.version})",
+                new GUIStyle(bodyStyle) { alignment = TextAnchor.MiddleLeft, normal = { textColor = Color.black } });
+            if (GUI.Button(new Rect(bar.xMax - 168, bar.y + 7, 156, 32), "DOWNLOAD", mapButtonActiveStyle))
+                Application.OpenURL(UpdateCheck.NewerUrl);
+        }
+    }
+
+    // ------------------------------------------------------------------ Practice
+
+    static readonly string[] ShortModeNames = { "FREE FOR ALL", "TEAM DM", "GUN GAME", "1 IN CHAMBER", "INFECTION" };
+
+    void DrawPracticeTab(Rect r)
+    {
+        GUI.Label(new Rect(r.x, r.y, r.width, 40), "PRACTICE VS BOTS", h2Style);
+        GUI.Label(new Rect(r.x, r.y + 44, r.width, 24), "An offline match against bots: warm up, learn the maps, try the modes.", bodyStyle);
+        float y = r.y + 88;
+        bool changed = false;
+
+        GUI.Label(new Rect(r.x, y, 200, 20), "MAP", smallStyle);
+        int shownMap = Mathf.Clamp(GameSettings.Map, 0, MapCatalog.Count - 1);
+        void PickMap(int i)
+        {
+            GameSettings.Map = (i + MapCatalog.Count) % MapCatalog.Count;
+            changed = true;
+            MapCatalog.Apply(GameSettings.Map);
+        }
+        float mw = Mathf.Min(r.width, 420);
+        if (GUI.Button(new Rect(r.x, y + 22, 44, 36), "<", mapButtonStyle)) PickMap(shownMap - 1);
+        GUI.Label(new Rect(r.x + 48, y + 22, mw - 96, 36), MapCatalog.NameOf(shownMap).ToUpper(), new GUIStyle(mapButtonActiveStyle) { fontSize = 15 });
+        if (GUI.Button(new Rect(r.x + mw - 44, y + 22, 44, 36), ">", mapButtonStyle)) PickMap(shownMap + 1);
+        y += 74;
+
+        GUI.Label(new Rect(r.x, y, 200, 20), "MODE", smallStyle);
+        float bw = (r.width - 4 * 8) / 5f;
+        for (int i = 0; i < 5; i++)
+            if (GUI.Button(new Rect(r.x + i * (bw + 8), y + 22, bw, 36), ShortModeNames[i],
+                    GameSettings.PracticeMode == i ? mapButtonActiveStyle : mapButtonStyle) && GameSettings.PracticeMode != i)
+            { GameSettings.PracticeMode = i; changed = true; }
+        y += 74;
+
+        GUI.Label(new Rect(r.x, y, 200, 20), "BOT DIFFICULTY", smallStyle);
+        float dw = (Mathf.Min(r.width, 420) - 16) / 3f;
+        for (int i = 0; i < 3; i++)
+            if (GUI.Button(new Rect(r.x + i * (dw + 8), y + 22, dw, 36), Difficulties[i], GameSettings.PracticeDifficulty == i ? mapButtonActiveStyle : mapButtonStyle)
+                && GameSettings.PracticeDifficulty != i)
+            { GameSettings.PracticeDifficulty = i; changed = true; }
+        y += 74;
+
+        float bots = GameSettings.PracticeBots, score = GameSettings.PracticeScore;
+        Slider(ref y, r, "BOTS", ref bots, 1f, 11f, v => $"{Mathf.RoundToInt(v)}", ref changed);
+        Slider(ref y, r, "SCORE TO WIN", ref score, 5f, 100f, v => $"{Mathf.RoundToInt(v / 5f) * 5}", ref changed);
+        GameSettings.PracticeBots = Mathf.RoundToInt(bots);
+        GameSettings.PracticeScore = Mathf.RoundToInt(score / 5f) * 5;
+        if (changed) GameSettings.Save();
+
+        if (GUI.Button(new Rect(r.x, r.yMax - 60, Mathf.Min(r.width, 420), 54), "START PRACTICE", bigButtonStyle))
+            StartPractice();
+        if (!string.IsNullOrEmpty(status))
+            GUI.Label(new Rect(r.x + Mathf.Min(r.width, 420) + 20, r.yMax - 56, r.width - 440, 50), $"<color=#ff8a80>{status}</color>", bodyStyle);
     }
 
     void Nav(ref float y, string text, MenuTab t)
@@ -195,7 +263,11 @@ public partial class GameUI
         y += boxH + 16;
 
         if (!string.IsNullOrEmpty(status))
-            GUI.Label(new Rect(r.x, y, r.width, 44), connecting ? status : $"<color=#ff8a80>{status}</color>", bodyStyle);
+        {
+            GUI.Label(new Rect(r.x, y, r.width - 190, 44), connecting ? status : $"<color=#ff8a80>{status}</color>", bodyStyle);
+            if (status.Contains("Download the latest") && GUI.Button(new Rect(r.xMax - 170, y + 2, 170, 36), "DOWNLOAD", mapButtonActiveStyle))
+                Application.OpenURL(UpdateCheck.DownloadPage);
+        }
     }
 
     // ------------------------------------------------------------------ Lobby
@@ -432,7 +504,7 @@ public partial class GameUI
 
     // ------------------------------------------------------------------ Options (main menu Settings and the Esc menu)
 
-    enum OptionsTab { General, Controls, Keybindings, Voice }
+    enum OptionsTab { General, Controls, Keybindings, Voice, Hud }
     OptionsTab optionsTab;
     int rebinding = -1; // index into Bindings.All while waiting for a key
     Vector2 bindScroll;
@@ -441,23 +513,25 @@ public partial class GameUI
     {
         GUI.Label(new Rect(r.x, r.y, 300, 40), title, h2Style);
         // Tabs.
-        float tw = 130, tx = r.xMax - tw * 4 - 24;
-        foreach (OptionsTab t in System.Enum.GetValues(typeof(OptionsTab)))
+        var tabs = (OptionsTab[])System.Enum.GetValues(typeof(OptionsTab));
+        float tw = (r.width - (tabs.Length - 1) * 8) / tabs.Length, tx = r.x;
+        foreach (OptionsTab t in tabs)
         {
-            if (GUI.Button(new Rect(tx, r.y + 4, tw, 34), t.ToString().ToUpper(), optionsTab == t ? mapButtonActiveStyle : mapButtonStyle) && optionsTab != t)
+            if (GUI.Button(new Rect(tx, r.y + 44, tw, 32), t.ToString().ToUpper(), optionsTab == t ? mapButtonActiveStyle : mapButtonStyle) && optionsTab != t)
             {
                 optionsTab = t;
                 rebinding = -1;
             }
             tx += tw + 8;
         }
-        var body = new Rect(r.x, r.y + 60, r.width, r.height - 60);
+        var body = new Rect(r.x, r.y + 92, r.width, r.height - 92);
         switch (optionsTab)
         {
             case OptionsTab.General: DrawGeneralOptions(body); break;
             case OptionsTab.Controls: DrawControlOptions(body); break;
             case OptionsTab.Keybindings: DrawKeybindings(body); break;
             case OptionsTab.Voice: DrawVoiceOptions(body); break;
+            case OptionsTab.Hud: DrawHudOptions(body); break;
         }
     }
 
@@ -472,8 +546,17 @@ public partial class GameUI
         { GameSettings.InvertY = false; changed = true; }
         if (GUI.Button(new Rect(r.x + 128, y + 24, 120, 36), "ON", GameSettings.InvertY ? mapButtonActiveStyle : mapButtonStyle) && !GameSettings.InvertY)
         { GameSettings.InvertY = true; changed = true; }
-        y += 80;
-        GUI.Label(new Rect(r.x, y, r.width, 44), "Mouse: left click fire · right click aim · middle click hook · wheel switches slots. Keys are in KEYBINDINGS.", bodyStyle);
+        y += 76;
+        Slider(ref y, r, "CONTROLLER LOOK SENSITIVITY", ref GameSettings.PadSensitivity, 0.3f, 3f, v => $"{v * 100f:0}%", ref changed);
+        GUI.Label(new Rect(r.x, y, 300, 20), "CONTROLLER AIM ASSIST", smallStyle);
+        if (GUI.Button(new Rect(r.x, y + 24, 120, 36), "OFF", GameSettings.AimAssist ? mapButtonStyle : mapButtonActiveStyle) && GameSettings.AimAssist)
+        { GameSettings.AimAssist = false; changed = true; }
+        if (GUI.Button(new Rect(r.x + 128, y + 24, 120, 36), "ON", GameSettings.AimAssist ? mapButtonActiveStyle : mapButtonStyle) && !GameSettings.AimAssist)
+        { GameSettings.AimAssist = true; changed = true; }
+        y += 76;
+        GUI.Label(new Rect(r.x, y, r.width, 66),
+            "<size=13>Mouse: left fire · right aim · middle hook · wheel switches. Controller: RT fire · LT aim · A jump · B crouch · X reload / pick up · " +
+            "Y next weapon · RB throw · LB hook · R3 melee · L3 sprint · D-pad ↑ grenades, ↓ prone, → talk · View scores · Menu pause.</size>", bodyStyle);
         if (changed) GameSettings.Save();
     }
 

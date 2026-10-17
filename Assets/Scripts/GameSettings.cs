@@ -17,6 +17,13 @@ public static class GameSettings
     public static int VoiceMode = 1; // 0 off, 1 push to talk, 2 open mic (VoiceChat)
     public static float VoiceVolume = 1f, MicGain = 1f, VoiceGate = 0.02f;
     public static string MicDevice = ""; // empty: the system default
+    // Options > HUD: crosshair and colorblind mode (0 off, 1 red-green, 2 blue-yellow)
+    public static int CrosshairStyle = 1, CrosshairColor = 0, Colorblind = 0;
+    public static float CrosshairSize = 1f, CrosshairThickness = 1.5f;
+    public static bool CrosshairOutline;
+    public static float PadSensitivity = 1f; // controller look speed
+    public static bool AimAssist = true;     // controller only: slower look while on an enemy
+    public static int PracticeBots = 5, PracticeDifficulty = 1, PracticeMode = 0, PracticeScore = 25; // Practice tab
     public static int FragLimit = 25;
     public static bool PublicGame = true; // list hosted games in Find Game
     public static int Mode;               // MatchRules.GameMode the host last picked
@@ -40,6 +47,18 @@ public static class GameSettings
         MicGain = PlayerPrefs.GetFloat("ffa.micgain", 1f);
         VoiceGate = PlayerPrefs.GetFloat("ffa.voicegate", 0.02f);
         MicDevice = PlayerPrefs.GetString("ffa.mic", "");
+        PracticeBots = Mathf.Clamp(PlayerPrefs.GetInt("ffa.pbots", 5), 1, 11);
+        CrosshairStyle = Mathf.Clamp(PlayerPrefs.GetInt("ffa.xhair", 1), 0, 3);
+        CrosshairColor = Mathf.Clamp(PlayerPrefs.GetInt("ffa.xcolor", 0), 0, 5);
+        CrosshairSize = PlayerPrefs.GetFloat("ffa.xsize", 1f);
+        CrosshairThickness = PlayerPrefs.GetFloat("ffa.xthick", 1.5f);
+        CrosshairOutline = PlayerPrefs.GetInt("ffa.xoutline", 0) != 0;
+        Colorblind = Mathf.Clamp(PlayerPrefs.GetInt("ffa.colorblind", 0), 0, 2);
+        PadSensitivity = PlayerPrefs.GetFloat("ffa.padsens", 1f);
+        AimAssist = PlayerPrefs.GetInt("ffa.aimassist", 1) != 0;
+        PracticeDifficulty = Mathf.Clamp(PlayerPrefs.GetInt("ffa.pdiff", 1), 0, 2);
+        PracticeMode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.pmode", 0), 0, 4);
+        PracticeScore = Mathf.Clamp(PlayerPrefs.GetInt("ffa.pscore", 25), 5, 100);
         FragLimit = Mathf.Clamp(PlayerPrefs.GetInt("ffa.fraglimit", 25), 10, 100);
         PublicGame = PlayerPrefs.GetInt("ffa.public", 1) != 0;
         Mode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.mode", 0), 0, 4);
@@ -65,6 +84,18 @@ public static class GameSettings
         PlayerPrefs.SetFloat("ffa.micgain", MicGain);
         PlayerPrefs.SetFloat("ffa.voicegate", VoiceGate);
         PlayerPrefs.SetString("ffa.mic", MicDevice);
+        PlayerPrefs.SetInt("ffa.pbots", PracticeBots);
+        PlayerPrefs.SetInt("ffa.xhair", CrosshairStyle);
+        PlayerPrefs.SetInt("ffa.xcolor", CrosshairColor);
+        PlayerPrefs.SetFloat("ffa.xsize", CrosshairSize);
+        PlayerPrefs.SetFloat("ffa.xthick", CrosshairThickness);
+        PlayerPrefs.SetInt("ffa.xoutline", CrosshairOutline ? 1 : 0);
+        PlayerPrefs.SetInt("ffa.colorblind", Colorblind);
+        PlayerPrefs.SetFloat("ffa.padsens", PadSensitivity);
+        PlayerPrefs.SetInt("ffa.aimassist", AimAssist ? 1 : 0);
+        PlayerPrefs.SetInt("ffa.pdiff", PracticeDifficulty);
+        PlayerPrefs.SetInt("ffa.pmode", PracticeMode);
+        PlayerPrefs.SetInt("ffa.pscore", PracticeScore);
         PlayerPrefs.SetInt("ffa.fraglimit", FragLimit);
         PlayerPrefs.SetInt("ffa.public", PublicGame ? 1 : 0);
         PlayerPrefs.SetInt("ffa.mode", Mode);

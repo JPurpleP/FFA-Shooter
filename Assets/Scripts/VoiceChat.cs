@@ -156,7 +156,7 @@ public class VoiceChat : MonoBehaviour
             return;
         }
 
-        bool ptt = GameSettings.VoiceMode == 1 && Bindings.Held(GameAction.PushToTalk) && !GameUI.ChatTyping;
+        bool ptt = GameSettings.VoiceMode == 1 && (Bindings.Held(GameAction.PushToTalk) || GamepadInput.TalkHeld) && !GameUI.ChatTyping;
         while (pending.Count >= Frame)
         {
             pending.CopyTo(0, frame, 0, Frame);

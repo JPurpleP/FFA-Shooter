@@ -38,6 +38,8 @@ public partial class GameUI : MonoBehaviour
     static bool autoReady, autoStart, forcePause;
     static int lobbyMapTest = -1;
     static int modeOverride = -1; // -ffamode 0-4 (tests)
+    /// <summary>-ffainspect x y z: hold the view model turned by these angles (checking hands for clipping).</summary>
+    public static Vector3? InspectEuler { get; private set; }
     bool wasSummary; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
@@ -166,7 +168,7 @@ public partial class GameUI : MonoBehaviour
             if (sp.z < 0.1f) return null;
             return new Vector2(sp.x / scale, (Screen.height - sp.y) / scale);
         }
-        var espColor = new Color(0.35f, 1f, 0.5f, 0.95f);
+        var espColor = Accessible(new Color(0.35f, 1f, 0.5f, 0.95f));
         var nameStyle = new GUIStyle(centerLabel) { fontSize = 13, fontStyle = FontStyle.Bold };
         foreach (var p in FpsPlayer.All)
         {
@@ -195,7 +197,7 @@ public partial class GameUI : MonoBehaviour
             Shadowed(new Rect(cx - 100f, box.yMin - 20f, 200f, 18f), $"{p.DisplayName}  <size=11>{dist:0}m</size>", nameStyle, espColor);
             float hp = Mathf.Clamp01(p.Health.Value / (float)FpsPlayer.MaxHealth);
             Fill(new Rect(box.xMin - 5f, box.yMin, 3f, box.height), new Color(0f, 0f, 0f, 0.6f));
-            Fill(new Rect(box.xMin - 5f, box.yMax - box.height * hp, 3f, box.height * hp), Color.Lerp(new Color(1f, 0.2f, 0.2f), new Color(0.3f, 1f, 0.4f), hp));
+            Fill(new Rect(box.xMin - 5f, box.yMax - box.height * hp, 3f, box.height * hp), HealthColor(hp));
             // Skeleton.
             if (p.Body == null) continue;
             p.Body.GetBones(espBones);
@@ -235,7 +237,7 @@ public partial class GameUI : MonoBehaviour
     }
 
     /// <summary>The key currently bound to an action, for on-screen hints.</summary>
-    static string K(GameAction a) => Bindings.Label(a);
+    static string K(GameAction a) => GamepadInput.UsingGamepad ? GamepadInput.Label(a) : Bindings.Label(a);
 
     static string ThrowShort(int type) => type switch { 0 => "Frag", 1 => "Smoke", 2 => "Rope", _ => "Molotov" };
 
@@ -386,6 +388,12 @@ public partial class GameUI : MonoBehaviour
         Net.OnClientDisconnectCallback += OnClientDisconnect;
         GraphicsQuality.Apply();
         VoiceChat.Ensure();
+        UpdateCheck.Begin();
+        GamepadDriver.Ensure();
+        // Same-version games only: clients send their version, the host turns away anyone else.
+        Net.NetworkConfig.ConnectionApproval = true;
+        Net.NetworkConfig.ConnectionData = UpdateCheck.Payload;
+        Net.ConnectionApprovalCallback = UpdateCheck.Approve;
 
         var args = Environment.GetCommandLineArgs();
         string Arg(string flag) { int i = Array.IndexOf(args, flag); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
@@ -406,7 +414,8 @@ public partial class GameUI : MonoBehaviour
         if (args.Contains("-ffaleaderboard")) TestLeaderboard();           // tests: log the global top 10
         if (Arg("-ffachat") is { } say) StartCoroutine(TestChat(say));     // tests: say something once in a game
         if (int.TryParse(Arg("-ffafraglimit"), out int fragLimit)) MatchRules.OverrideFragLimit(fragLimit);
-        if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 2); // screenshot tests
+        if (int.TryParse(Arg("-ffamenutab"), out int mt)) tab = (MenuTab)Mathf.Clamp(mt, 0, 5); // screenshot tests
+        if (int.TryParse(Arg("-ffaoptionstab"), out int ot)) optionsTab = (OptionsTab)Mathf.Clamp(ot, 0, 4);
         if (int.TryParse(Arg("-ffaskin"), out int sk)) GameSettings.Skin = Mathf.Clamp(sk, 0, Skins.Count - 1);
         if (int.TryParse(Arg("-ffastance"), out int ts)) TestStance = ts;
         if (int.TryParse(Arg("-ffathrowtype"), out int tt)) TestThrowType = Mathf.Clamp(tt, 0, 3);
@@ -428,6 +437,14 @@ public partial class GameUI : MonoBehaviour
         }
         if (float.TryParse(Arg("-ffalean"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float forcedLean))
             ForceLean = Mathf.Clamp(forcedLean, -1f, 1f);
+        if (Array.IndexOf(args, "-ffainspect") is var ii and >= 0 && ii + 3 < args.Length)
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            float.TryParse(args[ii + 1], System.Globalization.NumberStyles.Float, ci, out float ix);
+            float.TryParse(args[ii + 2], System.Globalization.NumberStyles.Float, ci, out float iy);
+            float.TryParse(args[ii + 3], System.Globalization.NumberStyles.Float, ci, out float iz);
+            InspectEuler = new Vector3(ix, iy, iz);
+        }
         if (int.TryParse(Arg("-ffagraphics"), out int gfx)) { GameSettings.Graphics = Mathf.Clamp(gfx, 0, 2); GraphicsQuality.Apply(); }
         if (float.TryParse(Arg("-ffabench"), out float benchSeconds)) FrameBench.Begin(benchSeconds);
         if (float.TryParse(Arg("-ffaquitafter"), out float quitAfter))
@@ -437,7 +454,9 @@ public partial class GameUI : MonoBehaviour
             mapOverride = Mathf.Clamp(testMap, 0, MapCatalog.Count - 1);
             MapCatalog.Apply(HostMap);
         }
-        if (args.Contains("-ffahost") || args.Contains("-ffarelay"))
+        if (args.Contains("-ffapractice"))
+            StartPractice();
+        else if (args.Contains("-ffahost") || args.Contains("-ffarelay"))
             Host(args.Contains("-ffarelay"), lobby: args.Contains("-ffalobby")); // test sessions skip the lobby unless asked
         else if (Arg("-ffaclient") is { } ip)
         {
@@ -522,7 +541,7 @@ public partial class GameUI : MonoBehaviour
         if (inGame)
         {
             var kb = Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame && !DevPanel.Open && !escUsed)
+            if (((kb != null && kb.escapeKey.wasPressedThisFrame) || GamepadInput.PausePressed) && !DevPanel.Open && !escUsed)
             {
                 if ((pauseOptions || pausePlayers) && Cursor.lockState != CursorLockMode.Locked) pauseOptions = pausePlayers = false; // back to the pause menu
                 else SetCursorCaptured(Cursor.lockState != CursorLockMode.Locked);
@@ -621,6 +640,64 @@ public partial class GameUI : MonoBehaviour
         Debug.Log($"[FFA] Joining {ip}:{p}");
     }
 
+    // ---------------------------------------------------------------- practice
+
+    /// <summary>This session is an offline practice match against bots.</summary>
+    public static bool Practice { get; private set; }
+    static readonly string[] BotNames =
+    {
+        "Sarge", "Moose", "Rook", "Viper", "Gizmo", "Tank", "Ghost", "Biscuit", "Maverick", "Pickles", "Duke", "Nova",
+    };
+    public static readonly string[] Difficulties = { "EASY", "NORMAL", "HARD" };
+    static readonly float[] DifficultyAccuracy = { 0.25f, 0.5f, 0.8f };
+
+    /// <summary>Offline match against bots: a local-only host (no Relay, not listed), bots fill the lobby, go.</summary>
+    void StartPractice()
+    {
+        if (connecting || InSession) return;
+        LocalPlayerName = SanitizeName(GameSettings.Name);
+        MapCatalog.Apply(HostMap);
+        RelayConnect.ClearCode();
+        var transport = Net.GetComponent<UnityTransport>();
+        transport.SetConnectionData("127.0.0.1", FreeUdpPort(), "127.0.0.1"); // nobody else can reach it
+        MatchRules.BeginSession(true);
+        MatchRules.SetFragLimit(GameSettings.PracticeScore);
+        MatchRules.SetMode((MatchRules.GameMode)(modeOverride >= 0 ? modeOverride : GameSettings.PracticeMode));
+        MatchRules.SetMapVote(GameSettings.MapVote);
+        DevSettings.BotAccuracy = DifficultyAccuracy[GameSettings.PracticeDifficulty];
+        Practice = true;
+        if (!Net.StartHost())
+        {
+            Practice = false;
+            status = "Couldn't start the practice match.";
+            return;
+        }
+        status = "";
+        Debug.Log($"[FFA] Practice: {GameSettings.PracticeBots} bots, {Difficulties[GameSettings.PracticeDifficulty]}, {MatchRules.ModeName(MatchRules.Mode)}");
+        StartCoroutine(FillWithBots(GameSettings.PracticeBots));
+    }
+
+    System.Collections.IEnumerator FillWithBots(int count)
+    {
+        float give = Time.unscaledTime + 10f;
+        while (FpsPlayer.Local == null && Time.unscaledTime < give) yield return null;
+        if (!Practice || !Net.IsServer) yield break;
+        var names = BotNames.OrderBy(_ => UnityEngine.Random.value).ToArray();
+        for (int i = 0; i < count; i++)
+        {
+            FpsPlayer.SpawnBot(BotMode.Fighter, names[i % names.Length]);
+            yield return null;
+        }
+        yield return null;
+        MatchRules.StartMatch();
+    }
+
+    static ushort FreeUdpPort()
+    {
+        using var u = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        return (ushort)((IPEndPoint)u.Client.LocalEndPoint).Port;
+    }
+
     void Disconnect()
     {
         GetComponent<MatchRules>()?.StopAllCoroutines();
@@ -637,6 +714,9 @@ public partial class GameUI : MonoBehaviour
         winner = "";
         status = "";
         lobbyBusyUntil = 0f;
+        if (Practice) DevSettings.BotAccuracy = 0.5f;
+        Spectator.Stop();
+        Practice = false;
     }
 
     bool TryGetPort(out ushort p)
@@ -807,13 +887,7 @@ public partial class GameUI : MonoBehaviour
         if (!me.IsDead && me.AdsAmount < 0.6f && !me.IsScoped)
         {
             float gap = 2f + (def != null ? Mathf.Lerp(def.HipSpread, def.AdsSpread, me.AdsAmount) * 1.8f : 2f);
-            const float len = 4.5f, th = 1.5f;
-            var c = new Color(1, 1, 1, 0.9f * (1f - me.AdsAmount));
-            Fill(new Rect(cx - gap - len, cy - th / 2, len, th), c);
-            Fill(new Rect(cx + gap, cy - th / 2, len, th), c);
-            Fill(new Rect(cx - th / 2, cy - gap - len, th, len), c);
-            Fill(new Rect(cx - th / 2, cy + gap, th, len), c);
-            Fill(new Rect(cx - 0.75f, cy - 0.75f, 1.5f, 1.5f), c);
+            DrawCrosshair(cx, cy, gap, 1f - me.AdsAmount);
         }
         // Grappling hook (if you've picked one up): cyan brackets on hookable spots, cooldown below.
         if (!me.IsDead && !me.InDuel && me.HasGrapple.Value)
@@ -888,78 +962,82 @@ public partial class GameUI : MonoBehaviour
         if (st != Stance.Stand && !me.IsDead)
             Shadowed(new Rect(32, h - 98, 200, 22), $"<size=13>{(st == Stance.Slide ? "SLIDING" : st == Stance.Prone ? "PRONE" : "CROUCHED")}</size>", label, new Color(1f, 1f, 1f, 0.75f));
 
-        // Health
-        var hpColor = me.Health.Value > 50 ? Color.white : me.Health.Value > 25 ? new Color(1f, 0.8f, 0.3f) : new Color(1f, 0.3f, 0.3f);
-        Shadowed(new Rect(30, h - 70, 300, 50), $"+ {me.Health.Value}", bigLabel, hpColor);
-        Fill(new Rect(32, h - 22, 160, 6), new Color(0f, 0f, 0f, 0.5f));
-        Fill(new Rect(32, h - 22, 160 * me.Health.Value / (float)FpsPlayer.MaxHealth, 6), hpColor);
-
-        // Weapon slots and ammo
+        // Your own health, slots and ammo (not while spectating someone else).
         var inv = me.Inv;
-        var right = new GUIStyle(label) { alignment = TextAnchor.UpperRight };
-        var ammoStyle = new GUIStyle(bigLabel) { alignment = TextAnchor.UpperRight };
-        if (me.InDuel)
+        if (!Spectator.Active)
         {
-            // Golden duel: fists, the opponent's health and the sudden-death clock.
-            var gold = new Color(1f, 0.82f, 0.25f);
-            Shadowed(new Rect(w - 330, h - 75, 300, 50), "FISTS", ammoStyle, gold);
-            Shadowed(new Rect(w - 330, h - 98, 300, 24), "[LMB] punch", right, new Color(1f, 1f, 1f, 0.7f));
-            var opp = me.DuelOpponent;
-            Shadowed(new Rect(0, 40, w, 30), "GOLDEN DUEL" + (opp != null ? $"  ·  vs {opp.DisplayName}" : ""), centerLabel, gold);
-            if (opp != null)
-            {
-                float bw = 260f;
-                Fill(new Rect(w / 2 - bw / 2, 70, bw, 8), new Color(0f, 0f, 0f, 0.5f));
-                Fill(new Rect(w / 2 - bw / 2, 70, bw * Mathf.Clamp01(opp.Health.Value / (float)FpsPlayer.MaxHealth), 8), new Color(1f, 0.3f, 0.25f));
-            }
-            float sd = DuelManager.SuddenDeathAfter - (t - me.DuelStartedAt);
-            Shadowed(new Rect(0, 82, w, 24), sd > 0f ? $"<size=13>Sudden death in {Mathf.CeilToInt(sd)}s</size>" : "<size=15>SUDDEN DEATH</size>",
-                centerLabel, sd > 0f ? new Color(1f, 1f, 1f, 0.7f) : new Color(1f, 0.3f, 0.3f, 0.6f + 0.4f * Mathf.Sin(t * 8f)));
-        }
-        else if (def != null && def.IsThrowable)
-        {
-            // Slot 3: how many of the selected throwable are left.
-            Shadowed(new Rect(w - 330, h - 75, 300, 50), $"{me.CurrentMag}", ammoStyle, Color.white);
-            Shadowed(new Rect(w - 530, h - 98, 500, 24), $"<size=13>Hold LMB / {K(GameAction.Grenade)}, release to throw  ·  {K(GameAction.Slot3)}: next type</size>", right, new Color(1f, 1f, 1f, 0.7f));
-        }
-        else if (def != null)
-        {
-            string ammo = me.IsReloading && !def.ReloadPerRound
-                ? $"RELOADING {Mathf.RoundToInt(me.ReloadProgress * 100)}%"
-                : $"{me.CurrentMag} <size=22>/ {me.CurrentReserve}</size>";
-            bool empty = me.CurrentMag == 0 && !me.IsReloading;
-            Shadowed(new Rect(w - 330, h - 75, 300, 50), ammo, ammoStyle, empty ? new Color(1f, 0.3f, 0.3f) : Color.white);
-            if (empty && me.CurrentReserve == 0)
-                Shadowed(new Rect(w - 330, h - 98, 300, 24), "NO AMMO", right, new Color(1f, 0.3f, 0.3f));
-            else if (empty || (me.CurrentMag < def.MagSize / 4 && !me.IsReloading))
-                Shadowed(new Rect(w - 330, h - 98, 300, 24), $"[{K(GameAction.Reload)}] RELOAD", right, new Color(1f, 0.8f, 0.3f));
-        }
-        for (int slot = 0; slot < 2; slot++)
-        {
-            var sd = WeaponDefs.Get(inv.Weapon(slot));
-            bool active = slot == inv.Active;
-            string text = sd != null ? $"[{slot + 1}] {sd.Name}  <size=12>{sd.Caliber}</size>" : $"[{slot + 1}] —";
-            Shadowed(new Rect(w - 530, h - 174 + slot * 24, 500, 24), text, right,
-                active ? Color.white : new Color(1f, 1f, 1f, 0.45f));
-        }
+            // Health
+            var hpColor = me.Health.Value > 50 ? Color.white : me.Health.Value > 25 ? new Color(1f, 0.8f, 0.3f) : new Color(1f, 0.3f, 0.3f);
+            Shadowed(new Rect(30, h - 70, 300, 50), $"+ {me.Health.Value}", bigLabel, hpColor);
+            Fill(new Rect(32, h - 22, 160, 6), new Color(0f, 0f, 0f, 0.5f));
+            Fill(new Rect(32, h - 22, 160 * me.Health.Value / (float)FpsPlayer.MaxHealth, 6), hpColor);
 
-        // Slot 3: throwables, the selected kind highlighted (3 again cycles, T throws from any slot).
-        var parts = new System.Collections.Generic.List<string>();
-        for (int tt = 0; tt < WeaponDefs.Throwables.Length; tt++)
-        {
-            int n = inv.ThrowCount(tt);
-            if (n <= 0) continue;
-            string nm = ThrowShort(tt);
-            parts.Add(tt == inv.Throwable ? $"<b>{nm} × {n}</b>" : $"<color=#ffffff88>{nm} × {n}</color>");
+            // Weapon slots and ammo
+            var right = new GUIStyle(label) { alignment = TextAnchor.UpperRight };
+            var ammoStyle = new GUIStyle(bigLabel) { alignment = TextAnchor.UpperRight };
+            if (me.InDuel)
+            {
+                // Golden duel: fists, the opponent's health and the sudden-death clock.
+                var gold = new Color(1f, 0.82f, 0.25f);
+                Shadowed(new Rect(w - 330, h - 75, 300, 50), "FISTS", ammoStyle, gold);
+                Shadowed(new Rect(w - 330, h - 98, 300, 24), "[LMB] punch", right, new Color(1f, 1f, 1f, 0.7f));
+                var opp = me.DuelOpponent;
+                Shadowed(new Rect(0, 40, w, 30), "GOLDEN DUEL" + (opp != null ? $"  ·  vs {opp.DisplayName}" : ""), centerLabel, gold);
+                if (opp != null)
+                {
+                    float bw = 260f;
+                    Fill(new Rect(w / 2 - bw / 2, 70, bw, 8), new Color(0f, 0f, 0f, 0.5f));
+                    Fill(new Rect(w / 2 - bw / 2, 70, bw * Mathf.Clamp01(opp.Health.Value / (float)FpsPlayer.MaxHealth), 8), new Color(1f, 0.3f, 0.25f));
+                }
+                float sd = DuelManager.SuddenDeathAfter - (t - me.DuelStartedAt);
+                Shadowed(new Rect(0, 82, w, 24), sd > 0f ? $"<size=13>Sudden death in {Mathf.CeilToInt(sd)}s</size>" : "<size=15>SUDDEN DEATH</size>",
+                    centerLabel, sd > 0f ? new Color(1f, 1f, 1f, 0.7f) : new Color(1f, 0.3f, 0.3f, 0.6f + 0.4f * Mathf.Sin(t * 8f)));
+            }
+            else if (def != null && def.IsThrowable)
+            {
+                // Slot 3: how many of the selected throwable are left.
+                Shadowed(new Rect(w - 330, h - 75, 300, 50), $"{me.CurrentMag}", ammoStyle, Color.white);
+                Shadowed(new Rect(w - 530, h - 98, 500, 24), $"<size=13>Hold LMB / {K(GameAction.Grenade)}, release to throw  ·  {K(GameAction.Slot3)}: next type</size>", right, new Color(1f, 1f, 1f, 0.7f));
+            }
+            else if (def != null)
+            {
+                string ammo = me.IsReloading && !def.ReloadPerRound
+                    ? $"RELOADING {Mathf.RoundToInt(me.ReloadProgress * 100)}%"
+                    : $"{me.CurrentMag} <size=22>/ {me.CurrentReserve}</size>";
+                bool empty = me.CurrentMag == 0 && !me.IsReloading;
+                Shadowed(new Rect(w - 330, h - 75, 300, 50), ammo, ammoStyle, empty ? new Color(1f, 0.3f, 0.3f) : Color.white);
+                if (empty && me.CurrentReserve == 0)
+                    Shadowed(new Rect(w - 330, h - 98, 300, 24), "NO AMMO", right, new Color(1f, 0.3f, 0.3f));
+                else if (empty || (me.CurrentMag < def.MagSize / 4 && !me.IsReloading))
+                    Shadowed(new Rect(w - 330, h - 98, 300, 24), $"[{K(GameAction.Reload)}] RELOAD", right, new Color(1f, 0.8f, 0.3f));
+            }
+            for (int slot = 0; slot < 2; slot++)
+            {
+                var sd = WeaponDefs.Get(inv.Weapon(slot));
+                bool active = slot == inv.Active;
+                string text = sd != null ? $"[{slot + 1}] {sd.Name}  <size=12>{sd.Caliber}</size>" : $"[{slot + 1}] —";
+                Shadowed(new Rect(w - 530, h - 174 + slot * 24, 500, 24), text, right,
+                    active ? Color.white : new Color(1f, 1f, 1f, 0.45f));
+            }
+
+            // Slot 3: throwables, the selected kind highlighted (3 again cycles, T throws from any slot).
+            var parts = new System.Collections.Generic.List<string>();
+            for (int tt = 0; tt < WeaponDefs.Throwables.Length; tt++)
+            {
+                int n = inv.ThrowCount(tt);
+                if (n <= 0) continue;
+                string nm = ThrowShort(tt);
+                parts.Add(tt == inv.Throwable ? $"<b>{nm} × {n}</b>" : $"<color=#ffffff88>{nm} × {n}</color>");
+            }
+            bool throwActive = inv.Active == Inventory.ThrowSlot;
+            string throwText = parts.Count > 0 ? $"[{K(GameAction.Slot3)}] {string.Join("   ", parts)}  <size=12>[{K(GameAction.Grenade)}] throw</size>" : $"[{K(GameAction.Slot3)}] —";
+            Shadowed(new Rect(w - 530, h - 126, 500, 24), throwText, right,
+                throwActive ? Color.white : parts.Count > 0 ? new Color(0.8f, 0.9f, 0.7f, 0.8f) : new Color(1f, 1f, 1f, 0.35f));
+            if (me.Snared)
+                Shadowed(new Rect(0, h / 2 + 90, w, 30), $"<b>SNARED</b>  {me.SnareSecondsLeft:0.0}s", new GUIStyle(centerLabel) { fontSize = 20 }, new Color(0.95f, 0.7f, 0.35f));
+            if (me.IsCookingGrenade)
+                Shadowed(new Rect(0, h / 2 + 30, w, 26), $"COOKING  {me.CookTimeLeft:0.0}", centerLabel, me.CookTimeLeft < 1f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.8f, 0.3f));
         }
-        bool throwActive = inv.Active == Inventory.ThrowSlot;
-        string throwText = parts.Count > 0 ? $"[{K(GameAction.Slot3)}] {string.Join("   ", parts)}  <size=12>[{K(GameAction.Grenade)}] throw</size>" : $"[{K(GameAction.Slot3)}] —";
-        Shadowed(new Rect(w - 530, h - 126, 500, 24), throwText, right,
-            throwActive ? Color.white : parts.Count > 0 ? new Color(0.8f, 0.9f, 0.7f, 0.8f) : new Color(1f, 1f, 1f, 0.35f));
-        if (me.Snared)
-            Shadowed(new Rect(0, h / 2 + 90, w, 30), $"<b>SNARED</b>  {me.SnareSecondsLeft:0.0}s", new GUIStyle(centerLabel) { fontSize = 20 }, new Color(0.95f, 0.7f, 0.35f));
-        if (me.IsCookingGrenade)
-            Shadowed(new Rect(0, h / 2 + 30, w, 26), $"COOKING  {me.CookTimeLeft:0.0}", centerLabel, me.CookTimeLeft < 1f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.8f, 0.3f));
 
         // Pickup prompt
         var pickup = me.NearbyPickup;
@@ -1005,7 +1083,9 @@ public partial class GameUI : MonoBehaviour
         }
 
         // Death / winner messages
-        if (me.IsDead)
+        if (me.IsDead && Spectator.Active)
+            DrawSpectating(w, h);
+        else if (me.IsDead)
         {
             float remaining = Mathf.Max(0f, FpsPlayer.RespawnDelay - (t - deathTime));
             string who = me.Eliminated.Value ? "ELIMINATED" : string.IsNullOrEmpty(me.LastKillerName) ? "YOU DIED" : $"KILLED BY {me.LastKillerName.ToUpper()}";
@@ -1027,7 +1107,7 @@ public partial class GameUI : MonoBehaviour
         }
 
         var kb = Keyboard.current;
-        if (Bindings.Held(GameAction.Scoreboard) || ForceScores)
+        if (Bindings.Held(GameAction.Scoreboard) || GamepadInput.ScoreboardHeld || ForceScores)
             DrawScoreboard(w, h, ModeOrder(players), me);
 
         if (CenterDot) // test flag: the exact screen centre, where every shot goes
@@ -1038,6 +1118,32 @@ public partial class GameUI : MonoBehaviour
     }
 
     Texture2D scopeMask;
+
+    /// <summary>Out of lives, watching someone: their name, health and gun along the bottom, and the controls.</summary>
+    void DrawSpectating(float w, float h)
+    {
+        var target = Spectator.Target;
+        if (target == null) return;
+        if (Spectator.Scoped) DrawScope(w, h);
+        if (Spectator.FirstPerson && !Spectator.Scoped)
+        {
+            float cx = w / 2, cy = h / 2;
+            var ch = new Color(1f, 1f, 1f, 0.6f * (1f - target.AimAmount));
+            Fill(new Rect(cx - 1, cy - 1, 2, 2), ch);
+        }
+        Fill(new Rect(0, h - 92, w, 92), new Color(0f, 0f, 0f, 0.55f));
+        Fill(new Rect(0, h - 92, w, 2), new Color(target.PlayerColor.r, target.PlayerColor.g, target.PlayerColor.b, 0.9f));
+        Shadowed(new Rect(0, h - 86, w, 18), "<b>SPECTATING</b>  ·  you're out of lives", new GUIStyle(centerLabel) { fontSize = 12 }, new Color(1f, 1f, 1f, 0.6f));
+        string hex = ColorUtility.ToHtmlStringRGB(target.PlayerColor);
+        var def = target.CurrentDef;
+        Shadowed(new Rect(0, h - 66, w, 30),
+            $"<color=#{hex}>■</color> <b>{target.DisplayName}</b>   <size=15>{Mathf.Max(0, target.Health.Value)} HP  ·  {(def != null ? def.Name : "Fists")}  ·  {target.Kills.Value} kills</size>",
+            new GUIStyle(centerLabel) { fontSize = 22 }, Color.white);
+        bool pad = UnityEngine.InputSystem.Gamepad.current != null && GamepadInput.UsingGamepad;
+        string keys = pad ? "LB / RB  switch player   ·   Y  " : $"Click / right-click  switch player   ·   {Bindings.Label(GameAction.Jump)}  ";
+        Shadowed(new Rect(0, h - 32, w, 22), keys + (Spectator.FirstPerson ? "third-person view" : "first-person view"),
+            new GUIStyle(centerLabel) { fontSize = 13 }, new Color(1f, 1f, 1f, 0.7f));
+    }
 
     void DrawScope(float w, float h)
     {

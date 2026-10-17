@@ -11,6 +11,7 @@ public struct DeathInfo : INetworkSerializable
     public float Distance;
     public int Seed;
     public bool Fell;
+    public bool Train;              // run over by the Dust Ridge train
     public bool Explosive;          // blast kill: always total dismemberment, thrown away from ExplosionCenter
     public Vector3 ExplosionCenter;
 
@@ -26,6 +27,7 @@ public struct DeathInfo : INetworkSerializable
         s.SerializeValue(ref Distance);
         s.SerializeValue(ref Seed);
         s.SerializeValue(ref Fell);
+        s.SerializeValue(ref Train);
         s.SerializeValue(ref Explosive);
         if (Explosive) s.SerializeValue(ref ExplosionCenter);
     }

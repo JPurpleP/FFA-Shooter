@@ -438,23 +438,14 @@ public class FpsPlayer : NetworkBehaviour
     void LateUpdate()
     {
         if (!IsSpawned || !IsLocalHuman) return;
-        if (IsDead && Eliminated.Value && Time.time - eliminatedSince > 3f)
+        // Out of lives: watch the players still in it (Spectator: their eyes or a chase camera).
+        if (IsDead && Eliminated.Value && Time.time - eliminatedSince > 3f && !KillCam.Active && Spectator.Drive(this))
         {
-            // Out of lives: watch the players still in it (click to switch).
-            var alive = new List<FpsPlayer>();
-            foreach (var p in All) if (p != this && p.IsSpawned && !p.IsDead && !p.Eliminated.Value) alive.Add(p);
-            if (alive.Count > 0)
-            {
-                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) spectateIndex++;
-                var target = alive[((spectateIndex % alive.Count) + alive.Count) % alive.Count];
-                SpectatingName = target.DisplayName;
-                var cam = playerCamera.transform;
-                Vector3 want = target.Head.position - target.Head.forward * 3.2f + Vector3.up * 0.9f;
-                cam.position = Vector3.Lerp(cam.position, want, 1f - Mathf.Exp(-6f * Time.deltaTime));
-                cam.rotation = Quaternion.Slerp(cam.rotation, Quaternion.LookRotation(target.Head.position + target.Head.forward * 4f - cam.position), 1f - Mathf.Exp(-8f * Time.deltaTime));
-                return;
-            }
+            SpectatingName = Spectator.Target.DisplayName;
+            return;
         }
+        Spectator.Stop();
+        SpectatingName = "";
         if (IsDead && deathCamTarget != null)
         {
             var cam = playerCamera.transform;
@@ -577,6 +568,7 @@ public class FpsPlayer : NetworkBehaviour
                 // Leftover swing momentum bleeds off quickly on the ground, slowly in the air.
                 momentum = Vector3.MoveTowards(momentum, Vector3.zero, (controller.isGrounded ? 30f : padFlight ? 0f : 2.5f) * Time.deltaTime);
             }
+            if (TrainRunner.Carry(transform.position, out var carried)) controller.Move(carried); // riding the train
             var flags = controller.Move((move + momentum + Vector3.up * verticalVelocity) * Time.deltaTime);
             if (Snared) EnforceTether();
             bool groundedNow = controller.isGrounded;
@@ -671,6 +663,8 @@ public class FpsPlayer : NetworkBehaviour
             float wheel = mouse.scroll.ReadValue().y;
             if (Mathf.Abs(wheel) > 0.1f) input.SwitchTo = wheel < 0f ? 3 : 4; // wheel down = next slot
         }
+        GamepadInput.AddTo(ref input, this);
+        if (GameUI.QuickChatOpen) input.SwitchTo = -1;
         return input;
     }
 
@@ -895,27 +889,22 @@ public class FpsPlayer : NetworkBehaviour
                 fistL.SetParent(weaponRig, false);
                 body.rightHandTarget = fistR;
                 body.leftHandTarget = fistL;
-                if (fpArms != null) fpArms.SetTargets(fistR, fistL);
+                if (fpArms != null) fpArms.SetTargets(fistR, fistL, GripFit.Fist, GripFit.Fist);
             }
             if (def != null)
             {
                 weaponModel = WeaponModel.Build(def.Id, weaponRig);
-                var rightHand = new GameObject("RightHand").transform;
-                rightHand.SetParent(weaponModel.transform, false);
-                rightHand.localPosition = new Vector3(0f, -0.035f, -0.01f);
+                // Hands fitted to this model's grip and fore-end (HandFit measures the parts); the support hand rides
+                // with a pump or a break-action barrel when that's what it holds.
+                var rightHand = HandFit.FiringHand(weaponModel, out var rightFit);
                 Transform leftHand = null;
-                if (!def.OneHanded)
-                {
-                    leftHand = new GameObject("LeftHand").transform;
-                    leftHand.SetParent(weaponModel.transform, false);
-                    leftHand.localPosition = def.LeftHand;
-                    // Break-action: the support hand holds the barrel, so it rides down with it when it tips open.
-                    if (weaponModel.breakAction != null) leftHand.SetParent(weaponModel.breakAction, true);
-                }
+                var leftFit = GripFit.Pistol;
+                if (!def.OneHanded) leftHand = HandFit.SupportHand(weaponModel, def, rightHand, rightFit, out leftFit);
                 heldRight = rightHand;
+                heldRightRest = weaponModel.transform.InverseTransformPoint(rightHand.position);
                 body.rightHandTarget = rightHand;
                 body.leftHandTarget = leftHand;
-                if (fpArms != null) fpArms.SetTargets(rightHand, leftHand);
+                if (fpArms != null) fpArms.SetTargets(rightHand, leftHand, rightFit, leftFit);
                 if (IsLocalHuman)
                     GameAssets.SetLayerRecursive(weaponModel.gameObject, GameAssets.ViewModelLayer);
                 else
@@ -974,7 +963,8 @@ public class FpsPlayer : NetworkBehaviour
                     else if (t < 0.7f) hand = Vector3.Lerp(breech + new Vector3(0f, 0.03f, -0.04f), breech, Mathf.SmoothStep(0f, 1f, (t - 0.45f) / 0.25f));
                     else hand = Vector3.Lerp(breech, grip, Mathf.SmoothStep(0f, 1f, (t - 0.7f) / 0.3f));
                 }
-                heldRight.localPosition = hand;
+                // Keyframes are in weapon space relative to the grip; the hand target may hang off the raked grip.
+                heldRight.position = weaponModel.transform.TransformPoint(heldRightRest + (hand - grip));
             }
             if (Time.time < drawEndTime)
             {
@@ -997,6 +987,13 @@ public class FpsPlayer : NetworkBehaviour
             weaponRig.localRotation = Quaternion.Euler(-30f * swing, 25f * swing, -20f * swing)
                                       * Quaternion.Euler(-24f * breakTilt, -10f * breakTilt, 14f * breakTilt)
                                       * Quaternion.Euler(-viewKick * d.RecoilKick * 0.6f + sway.y * free, sway.x * free, (slideT * 18f + sway.x * 1.5f) * free);
+            if (GameUI.InspectEuler is { } inspect)
+            {
+                // -ffainspect: the gun turned in front of the camera to check the hands from other sides (tests).
+                var rot = Quaternion.Euler(inspect);
+                weaponRig.localRotation = rot;
+                weaponRig.localPosition = new Vector3(0f, -0.03f, 0.55f) - rot * new Vector3(0f, 0f, 0.12f);
+            }
             if (weaponModel != null && weaponModel.breakAction != null) // break-action: barrels tip open to reload
                 weaponModel.breakAction.localRotation = Quaternion.Euler(reloading ? Mathf.Sin(Mathf.SmoothStep(0f, 1f, ReloadProgress) * Mathf.PI) * 32f : 0f, 0f, 0f);
         }
@@ -1234,7 +1231,7 @@ public class FpsPlayer : NetworkBehaviour
         if (DevSettings.GodMode && !botOnServer && OwnerClientId == NetworkManager.ServerClientId && amount < 9999) return false;
         if (botOnServer && brain != null && brain.invulnerable && amount < 9999) return false;
         Health.Value = Mathf.Max(0, Health.Value - amount);
-        if (!info.Fell && !botOnServer)
+        if (!info.Fell && !info.Train && !botOnServer)
         {
             Vector3 from = attacker != null && attacker != this ? attacker.head.position
                 : info.Explosive ? info.ExplosionCenter : info.Point - info.Direction * 3f;
@@ -1336,7 +1333,7 @@ public class FpsPlayer : NetworkBehaviour
             LastKillerName = killer.ToString();
             var def = WeaponDefs.Get(info.WeaponId);
             var gore = GorePlan.For(info).Describe();
-            LastDeathDetail = info.Fell ? "You fell to your death" :
+            LastDeathDetail = info.Fell ? "You fell to your death" : info.Train ? "Hit by the train" :
                 $"{(def != null ? def.Name : "")}{(info.HitPart == BodyModel.Part.Head ? " · headshot" : "")}{(gore != null ? " · " + gore.ToLower() : "")}";
             if (!InDuel && !info.Fell && NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(killerId, out var killerObj))
                 KillCam.Play(this, killerObj.GetComponent<FpsPlayer>(), info.WeaponId, corpse);
@@ -2397,7 +2394,6 @@ public class FpsPlayer : NetworkBehaviour
 
     // ------------------------------------------------------------------ game modes
 
-    int spectateIndex;
     float eliminatedSince = -100f;
     public string SpectatingName { get; private set; } = "";
 
@@ -2509,6 +2505,7 @@ public class FpsPlayer : NetworkBehaviour
     // ------------------------------------------------------------------ jump pads
 
     bool padFlight;
+    Vector3 heldRightRest; // firing hand's rest point in weapon space (break-action reload animation)
     float padLaunchTime = -10f;
 
     /// <summary>Owner: thrown by a jump pad. Horizontal speed is kept until you land.</summary>

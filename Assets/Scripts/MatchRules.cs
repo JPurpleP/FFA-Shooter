@@ -120,6 +120,8 @@ public partial class MatchRules : MonoBehaviour
         string text;
         if (info.Fell)
             text = $"{victim.DisplayName} fell to their death";
+        else if (info.Train)
+            text = $"{victim.DisplayName} was hit by the train";
         else if (killer == victim)
             text = $"{victim.DisplayName} blew themselves up [{def?.Name}]{extra}";
         else if (info.WeaponId == WeaponId.Fists && killer != null)
