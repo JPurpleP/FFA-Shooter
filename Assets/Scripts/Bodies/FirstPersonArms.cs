@@ -83,15 +83,15 @@ public class FirstPersonArms : MonoBehaviour
         var a = GameAssets.I;
         float s = arm.side, w = arm.fit.W, hd = arm.fit.Hd;
         Color c = arm.handColor, knuckleColor = arm.handColor * 0.93f;
-        const float fr = 0.0079f; // finger radius
+        const float fr = 0.0072f; // finger radius
 
         // Palm and heel just outside the grip on the palm side.
         var palm = Part(arm.hand, PrimitiveType.Sphere, "Palm", a.playerBody, c);
-        palm.localPosition = new Vector3(s * (w + 0.015f), -0.012f, -0.004f);
-        palm.localScale = new Vector3(0.03f, 0.09f, Mathf.Max(0.07f, hd * 2f + 0.02f));
+        palm.localPosition = new Vector3(s * (w + 0.0095f), -0.012f, -0.004f);
+        palm.localScale = new Vector3(0.026f, 0.086f, Mathf.Clamp(hd * 2f + 0.012f, 0.06f, 0.075f));
         var heel = Part(arm.hand, PrimitiveType.Sphere, "PalmHeel", a.playerBody, c);
-        heel.localPosition = new Vector3(s * (w + 0.013f), -0.038f, -hd * 0.55f - 0.006f);
-        heel.localScale = new Vector3(0.034f, 0.04f, 0.042f);
+        heel.localPosition = new Vector3(s * (w + 0.009f), -0.036f, -hd * 0.5f - 0.004f);
+        heel.localScale = new Vector3(0.03f, 0.036f, 0.038f);
 
         // Fingers: knuckle at the palm-side front corner, round the front, tips on the far side. Held from underneath
         // (Bar), the tips stop on the upper side rather than wrapping over the top.
@@ -101,13 +101,13 @@ public class FirstPersonArms : MonoBehaviour
             float y = 0.024f - i * 0.0185f;
             float r = i == 3 ? 0.0068f : fr;
             float reach = i == 0 || i == 3 ? 0.92f : 1f;
-            var p0 = new Vector3(s * (w + 0.009f), y, hd * 0.4f);
-            var p1 = new Vector3(s * w * 0.55f, y, hd + r + 0.001f);
-            var p2 = new Vector3(-s * w * 0.55f * reach, y - 0.001f, hd + r + 0.001f);
-            var p3 = new Vector3(-s * (w + r + 0.001f) * tipWrap, y - 0.002f, Mathf.Lerp(hd + r, hd * 0.25f, tipWrap) * reach);
+            var p0 = new Vector3(s * (w + 0.006f), y, hd * 0.45f);
+            var p1 = new Vector3(s * w * 0.55f, y, hd + r * 0.75f);
+            var p2 = new Vector3(-s * w * 0.55f * reach, y - 0.001f, hd + r * 0.75f);
+            var p3 = new Vector3(-s * (w + r * 0.75f) * tipWrap, y - 0.002f, Mathf.Lerp(hd + r * 0.75f, hd * 0.3f, tipWrap) * reach);
             var knuckle = Part(arm.hand, PrimitiveType.Sphere, "Knuckle", a.playerBody, knuckleColor);
-            knuckle.localPosition = p0 + new Vector3(s * 0.002f, 0f, -0.003f);
-            knuckle.localScale = Vector3.one * r * 2.3f;
+            knuckle.localPosition = p0 + new Vector3(s * 0.001f, 0f, -0.003f);
+            knuckle.localScale = Vector3.one * r * 2.05f;
             PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "FingerBase", a.playerBody, c), p0, p1, r);
             PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "FingerMid", a.playerBody, c), p1, p2, r * 0.95f);
             PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "FingerTip", a.playerBody, c), p2, p3, r * 0.88f);
@@ -118,22 +118,22 @@ public class FirstPersonArms : MonoBehaviour
         Vector3 t0, t1, t2;
         if (!arm.fit.Bar)
         {
-            t0 = new Vector3(s * (w + 0.008f), 0.016f, -hd - 0.004f);
-            t1 = new Vector3(-s * w * 0.2f, 0.028f, -hd - 0.011f);
-            t2 = new Vector3(-s * (w + 0.011f), 0.034f, -hd * 0.1f);
+            t0 = new Vector3(s * (w + 0.006f), 0.014f, -hd - 0.002f);
+            t1 = new Vector3(-s * w * 0.2f, 0.024f, -hd - 0.008f);
+            t2 = new Vector3(-s * (w + 0.008f), 0.028f, -hd * 0.15f);
         }
         else
         {
             t0 = new Vector3(s * (w + 0.006f), -0.016f, -hd - 0.004f);
             t1 = new Vector3(s * w * 0.2f, 0.004f, -hd - 0.009f);
-            t2 = new Vector3(-s * w * 0.35f, 0.022f, -hd - 0.008f);
+            t2 = new Vector3(-s * w * 0.3f, 0.016f, -hd - 0.007f);
         }
-        PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "ThumbBase", a.playerBody, c), t0, t1, 0.0098f);
-        PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "ThumbTip", a.playerBody, c), t1, t2, 0.0085f);
+        PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "ThumbBase", a.playerBody, c), t0, t1, 0.0092f);
+        PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "ThumbTip", a.playerBody, c), t1, t2, 0.0078f);
 
         // Wrist: a short tapered piece from the heel of the palm back to where the forearm starts.
         PlaceCapsule(Part(arm.hand, PrimitiveType.Capsule, "Wrist", a.playerBody, c),
-            heel.localPosition + new Vector3(s * 0.002f, 0.004f, 0.004f), WristPoint(arm), 0.0215f);
+            heel.localPosition + new Vector3(s * 0.001f, 0.004f, 0.004f), WristPoint(arm), 0.0205f);
         if (arm.gloved)
         {
             Vector3 wp = WristPoint(arm);
@@ -142,7 +142,7 @@ public class FirstPersonArms : MonoBehaviour
     }
 
     /// <summary>Where the wrist meets the forearm, in hand space: behind and below the palm.</summary>
-    static Vector3 WristPoint(Arm arm) => new(arm.side * (arm.fit.W + 0.013f), -0.05f, -arm.fit.Hd - 0.045f);
+    static Vector3 WristPoint(Arm arm) => new(arm.side * (arm.fit.W + 0.009f), -0.048f, -arm.fit.Hd - 0.04f);
 
     static Transform Part(Transform parent, PrimitiveType type, string name, Material mat, Color color)
     {

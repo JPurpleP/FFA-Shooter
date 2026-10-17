@@ -22,7 +22,7 @@ public struct GripFit
 public static class HandFit
 {
     const float Gap = 0.0015f; // skin clearance
-    const float SupportRoll = 40f; // degrees the support hand is rolled round the fore-end, palm toward the left
+    const float SupportRoll = 22f; // degrees the support hand is rolled round the fore-end, palm toward the left
 
     public static Transform FiringHand(WeaponModel model, out GripFit fit)
     {
@@ -82,9 +82,9 @@ public static class HandFit
         if (p.z < 0.06f && p.y < 0f && !firingFit.Bar && firing != null)
         {
             t.SetParent(firing.parent, false);
-            t.localPosition = firing.localPosition + firing.localRotation * new Vector3(-0.004f, -0.012f, 0.004f);
+            t.localPosition = firing.localPosition + firing.localRotation * new Vector3(-0.003f, -0.016f, 0.006f);
             t.localRotation = firing.localRotation;
-            fit = new GripFit { W = firingFit.W + 0.0175f, Hd = firingFit.Hd + 0.016f };
+            fit = new GripFit { W = firingFit.W + 0.011f, Hd = firingFit.Hd + 0.009f };
             return t;
         }
 
