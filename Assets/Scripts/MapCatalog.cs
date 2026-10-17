@@ -52,6 +52,38 @@ public class MapCatalog : MonoBehaviour
     }
 
     /// <summary>Activate one map and its lighting, and drop the bot graph so it is rebuilt for that map.</summary>
+    static readonly System.Collections.Generic.HashSet<GameObject> tidied = new();
+
+    /// <summary>
+    /// Once per map: matte objects skip reflection-probe lookups (the reflection wouldn't show anyway) and very
+    /// small props stop casting shadows (nobody sees a pebble's shadow). Both cost real time per frame on maps with
+    /// thousands of renderers.
+    /// </summary>
+    static void Tidy(GameObject root)
+    {
+        if (root == null || !tidied.Add(root)) return;
+        int probesOff = 0, shadowsOff = 0;
+        foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r is ParticleSystemRenderer) continue;
+            bool shiny = false;
+            foreach (var m in r.sharedMaterials)
+                if (m != null && ((m.HasProperty("_Glossiness") && m.GetFloat("_Glossiness") > 0.4f) || (m.HasProperty("_Metallic") && m.GetFloat("_Metallic") > 0.3f)))
+                    shiny = true;
+            if (!shiny && r.reflectionProbeUsage != UnityEngine.Rendering.ReflectionProbeUsage.Off)
+            {
+                r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+                probesOff++;
+            }
+            if (r.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.On && r.bounds.size.magnitude < 0.45f)
+            {
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                shadowsOff++;
+            }
+        }
+        Debug.Log($"[FFA] Tidied {root.name}: reflection probes off on {probesOff}, shadows off on {shadowsOff}");
+    }
+
     public static void Apply(int id)
     {
         if (I == null || I.maps == null || I.maps.Length == 0) return;
@@ -62,6 +94,7 @@ public class MapCatalog : MonoBehaviour
             if (I.maps[i].root != null) I.maps[i].root.SetActive(i == id);
 
         var e = I.maps[id];
+        Tidy(e.root);
         RenderSettings.fogColor = e.fogColor;
         RenderSettings.fogStartDistance = e.fogStart;
         RenderSettings.fogEndDistance = e.fogEnd;
