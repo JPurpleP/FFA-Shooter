@@ -40,6 +40,7 @@ public partial class GameUI : MonoBehaviour
     static int modeOverride = -1; // -ffamode 0-4 (tests)
     /// <summary>-ffainspect x y z: hold the view model turned by these angles (checking hands for clipping).</summary>
     public static Vector3? InspectEuler { get; private set; }
+    public static bool ReloadTest { get; private set; } // -ffareloadtest
     bool wasSummary; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
@@ -445,6 +446,7 @@ public partial class GameUI : MonoBehaviour
             float.TryParse(args[ii + 3], System.Globalization.NumberStyles.Float, ci, out float iz);
             InspectEuler = new Vector3(ix, iy, iz);
         }
+        ReloadTest = args.Contains("-ffareloadtest");
         if (int.TryParse(Arg("-ffagraphics"), out int gfx)) { GameSettings.Graphics = Mathf.Clamp(gfx, 0, 2); GraphicsQuality.Apply(); }
         if (float.TryParse(Arg("-ffabench"), out float benchSeconds)) FrameBench.Begin(benchSeconds);
         if (float.TryParse(Arg("-ffaquitafter"), out float quitAfter))
@@ -881,6 +883,7 @@ public partial class GameUI : MonoBehaviour
         if (!me.IsDead) DrawCompass(me, w);
         if (!me.IsDead) DrawTeamMarkers(me, w, h, scale);
         DrawChat(w, h);
+        DrawMedals(w, h);
 
         // Crosshair (fades out while aiming down sights) + hit marker
         float cx = w / 2, cy = h / 2;

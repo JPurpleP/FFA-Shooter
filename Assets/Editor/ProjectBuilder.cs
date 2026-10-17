@@ -1067,6 +1067,7 @@ public static partial class ProjectBuilder
         var skyCamp = ApplyLook("Timberline", new Look { Temperature = 3f, Tint = -3f, Saturation = 6f, Contrast = 14f, Exposure = 0.35f, Bloom = 1f, Vignette = 0.25f, Ao = 0.6f,
             Filter = Color.white, SkyTint = new Color(0.5f, 0.56f, 0.62f), SkyGround = new Color(0.36f, 0.38f, 0.32f), Atmosphere = 1.1f, SkyExposure = 1.25f });
         var camp = world.gameObject;
+        camp.AddComponent<Thunderstorm>(); // a storm rolls over every few minutes
         AddProbe(world, new Vector3(0f, 6f, 12f), new Vector3(100f, 30f, 90f));
         ValidateDoorways("Timberline");
         camp.SetActive(false);

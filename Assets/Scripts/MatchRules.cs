@@ -49,6 +49,7 @@ public partial class MatchRules : MonoBehaviour
     public static void BeginSession(bool lobby)
     {
         IsMatchOver = false;
+        Medals.Reset();
         UseLobby = LobbyOpen = lobby;
     }
 
@@ -58,6 +59,7 @@ public partial class MatchRules : MonoBehaviour
         if (!LobbyOpen) return;
         LobbyOpen = false;
         IsMatchOver = false;
+        Medals.Reset();
         FpsPlayer announcer = null;
         var players = new List<FpsPlayer>();
         foreach (var p in FpsPlayer.All) if (p.IsSpawned) players.Add(p);

@@ -144,6 +144,42 @@ public partial class GameUI
         }
     }
 
+    // ------------------------------------------------------------------ medals
+
+    readonly List<(Medal medal, float time)> medals = new();
+
+    public static void ShowMedal(Medal m)
+    {
+        if (instance == null) return;
+        instance.medals.Add((m, Time.time));
+        if (instance.medals.Count > 4) instance.medals.RemoveAt(0);
+        var listener = FpsPlayer.Local;
+        if (listener != null) AudioSource.PlayClipAtPoint(Medals.Sting(m), listener.transform.position, 0.8f);
+    }
+
+    /// <summary>Medal pop-ups under the crosshair: newest on top, each for a couple of seconds.</summary>
+    void DrawMedals(float w, float h)
+    {
+        float t = Time.time;
+        medals.RemoveAll(x => t - x.time > 2.6f);
+        float y = h * 0.62f;
+        var title = new GUIStyle(centerLabel) { fontSize = 26, fontStyle = FontStyle.Bold };
+        var sub = new GUIStyle(centerLabel) { fontSize = 13 };
+        for (int i = medals.Count - 1; i >= 0; i--)
+        {
+            var (m, at) = medals[i];
+            float age = t - at;
+            float a = Mathf.Clamp01(age / 0.12f) * Mathf.Clamp01((2.6f - age) / 0.5f);
+            float pop = 1f + 0.25f * Mathf.Exp(-age * 14f); // punches in, settles
+            var c = Medals.Tint(m);
+            c.a = a;
+            var size = new GUIStyle(title) { fontSize = Mathf.RoundToInt(26 * pop) };
+            Shadowed(new Rect(0, y, w, 34), Medals.Name(m), size, c);
+            Shadowed(new Rect(0, y + 30, w, 18), Medals.Detail(m), sub, new Color(1f, 1f, 1f, 0.75f * a));
+            y += 56;
+        }
+    }
+
     // ------------------------------------------------------------------ voice
 
     void MuteButton(FpsPlayer p, Rect r)

@@ -318,6 +318,7 @@ public class FpsPlayer : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
+        gameObject.AddComponent<Footsteps>().Init(this);
         if (!IsServer) MapCatalog.Apply(MapId.Value);
         // The host can switch maps in the lobby: follow it.
         MapId.OnValueChanged += (_, map) =>
@@ -721,6 +722,14 @@ public class FpsPlayer : NetworkBehaviour
         bool trigger = def.Automatic ? input.FireHeld : (input.FirePressed || (input.FireHeld && !triggerWasDown));
         triggerWasDown = input.FireHeld;
 
+        // -ffareloadtest: empty the gun and reload every few seconds (watching the reload animations).
+        if (GameUI.ReloadTest && IsLocalHuman && !reloading && Time.time > nextTestReload)
+        {
+            nextTestReload = Time.time + 2.5f + def.ReloadTime * (def.ReloadPerRound ? def.MagSize : 1f);
+            inv.SetMag(slot, 0);
+            mag = 0;
+            StartReload(def);
+        }
         // Reloading
         if (input.Reload && !reloading && mag < def.MagSize && (reserve > 0 || InfiniteAmmo))
             StartReload(def);
@@ -782,6 +791,7 @@ public class FpsPlayer : NetworkBehaviour
     void StartReload(WeaponDef def)
     {
         reloading = true;
+        reloadFromEmpty = inv.Mag(inv.Active) <= 0;
         reloadDuration = def.ReloadPerRound ? def.ReloadTime + 0.3f : def.ReloadTime;
         reloadEnd = Time.time + reloadDuration;
         audioSource.PlayOneShot(Sfx.Reload, 0.5f);
@@ -876,6 +886,7 @@ public class FpsPlayer : NetworkBehaviour
             builtWeapon = want;
             if (weaponModel != null) Destroy(weaponModel.gameObject);
             weaponModel = null;
+            reloadAnim = null;
             if (fistR != null) { Destroy(fistR.gameObject); Destroy(fistL.gameObject); fistR = fistL = null; }
             body.rightHandTarget = body.leftHandTarget = null;
             if (fpArms != null) fpArms.SetTargets(null, null);
@@ -905,6 +916,8 @@ public class FpsPlayer : NetworkBehaviour
                 body.rightHandTarget = rightHand;
                 body.leftHandTarget = leftHand;
                 if (fpArms != null) fpArms.SetTargets(rightHand, leftHand, rightFit, leftFit);
+                // Hands-on reloads in first person (break-actions keep their own tip-open animation).
+                reloadAnim = IsLocalHuman && weaponModel.breakAction == null ? new ReloadAnimator(weaponModel, def, leftHand) : null;
                 if (IsLocalHuman)
                     GameAssets.SetLayerRecursive(weaponModel.gameObject, GameAssets.ViewModelLayer);
                 else
@@ -941,7 +954,13 @@ public class FpsPlayer : NetworkBehaviour
             pos.y += Mathf.Sin(Time.time * 1.6f) * 0.0015f * free; // breathing
             bool breakAction = weaponModel != null && weaponModel.breakAction != null;
             float breakTilt = 0f;
-            if (reloading && !d.ReloadPerRound)
+            Vector3 reloadEuler = Vector3.zero;
+            if (reloadAnim != null)
+            {
+                reloadAnim.Update(reloading, ReloadProgress, reloadFromEmpty, out var reloadOffset, out reloadEuler);
+                pos += reloadOffset;
+            }
+            else if (reloading && !d.ReloadPerRound)
             {
                 float r = Mathf.Sin(Mathf.SmoothStep(0f, 1f, ReloadProgress) * Mathf.PI);
                 // Break-actions come up, in and nose-high so you watch the barrel tip open; others dip down.
@@ -984,7 +1003,7 @@ public class FpsPlayer : NetworkBehaviour
             float swing = Mathf.Sin(MeleeSwing * Mathf.PI) * (MeleeSwing < 1f ? 1f : 0f);
             pos += new Vector3(-0.06f, 0.05f, 0.16f) * swing;
             weaponRig.localPosition = pos;
-            weaponRig.localRotation = Quaternion.Euler(-30f * swing, 25f * swing, -20f * swing)
+            weaponRig.localRotation = Quaternion.Euler(reloadEuler) * Quaternion.Euler(-30f * swing, 25f * swing, -20f * swing)
                                       * Quaternion.Euler(-24f * breakTilt, -10f * breakTilt, 14f * breakTilt)
                                       * Quaternion.Euler(-viewKick * d.RecoilKick * 0.6f + sway.y * free, sway.x * free, (slideT * 18f + sway.x * 1.5f) * free);
             if (GameUI.InspectEuler is { } inspect)
@@ -1239,6 +1258,7 @@ public class FpsPlayer : NetworkBehaviour
         }
         if (!IsDead) return false;
 
+        int victimStreak = Streak.Value, killerHealth = attacker != null ? attacker.Health.Value : 0; // for medals
         Deaths.Value++;
         Streak.Value = 0;
         if (attacker != null && attacker != this)
@@ -1258,6 +1278,7 @@ public class FpsPlayer : NetworkBehaviour
         bool byOther = attacker != null && attacker != this;
         DeathRpc(info, byOther ? new FixedString32Bytes(attacker.DisplayName) : default, byOther ? attacker.NetworkObjectId : ulong.MaxValue);
         MatchRules.OnPlayerKilled(attacker, this, info);
+        Medals.ServerOnKill(attacker, this, info, victimStreak, killerHealth);
 
         if (respawnRoutine != null) StopCoroutine(respawnRoutine);
         respawnRoutine = StartCoroutine(RespawnAfterDelay());
@@ -2494,6 +2515,17 @@ public class FpsPlayer : NetworkBehaviour
         Debug.Log($"[FFA] Chat {DisplayName}: {text}");
     }
 
+    // ------------------------------------------------------------------ medals
+
+    /// <summary>Server: tell this player's owner they earned a medal.</summary>
+    public void AwardMedal(Medal m) => MedalRpc((byte)m);
+
+    [Rpc(SendTo.Owner)]
+    void MedalRpc(byte medal)
+    {
+        if (IsLocalHuman) GameUI.ShowMedal((Medal)medal);
+    }
+
     // ------------------------------------------------------------------ damage direction
 
     [Rpc(SendTo.Owner)]
@@ -2506,6 +2538,9 @@ public class FpsPlayer : NetworkBehaviour
 
     bool padFlight;
     Vector3 heldRightRest; // firing hand's rest point in weapon space (break-action reload animation)
+    ReloadAnimator reloadAnim;
+    bool reloadFromEmpty;
+    float nextTestReload = 3f;  // the magazine was empty when the reload started (rack the slide / handle at the end)
     float padLaunchTime = -10f;
 
     /// <summary>Owner: thrown by a jump pad. Horizontal speed is kept until you land.</summary>

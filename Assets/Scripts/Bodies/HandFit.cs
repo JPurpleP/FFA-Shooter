@@ -145,7 +145,7 @@ public static class HandFit
     }
 
     /// <summary>A renderer's bounds in the weapon's own space (exact corners, so rotated parts are covered).</summary>
-    static Bounds LocalBounds(Transform root, Renderer r)
+    public static Bounds LocalBounds(Transform root, Renderer r)
     {
         var mf = r.GetComponent<MeshFilter>();
         var mb = mf != null && mf.sharedMesh != null ? mf.sharedMesh.bounds : new Bounds(Vector3.zero, Vector3.one);
