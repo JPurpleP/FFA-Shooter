@@ -15,7 +15,7 @@ public class BackgroundTestWindow : MonoBehaviour
 
     void Awake()
     {
-        var args = Environment.GetCommandLineArgs();
+        var args = CommandLine.Args;
         Active = Array.IndexOf(args, "-ffabackground") >= 0;
         if (!Active) return;
         Application.runInBackground = true;

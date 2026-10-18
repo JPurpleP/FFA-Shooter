@@ -157,16 +157,13 @@ public class FirstPersonArms : MonoBehaviour
 
     static Transform Part(Transform parent, PrimitiveType type, string name, Material mat, Color color)
     {
-        var go = GameObject.CreatePrimitive(type);
-        DestroyImmediate(go.GetComponent<Collider>());
+        var go = Prims.Make(type);
         go.name = name;
         go.transform.SetParent(parent, false);
         var r = go.GetComponent<Renderer>();
         r.sharedMaterial = mat;
         r.shadowCastingMode = ShadowCastingMode.Off;
-        var block = new MaterialPropertyBlock();
-        block.SetColor("_Color", color);
-        r.SetPropertyBlock(block);
+        Prims.Tint(r, color);
         return go.transform;
     }
 

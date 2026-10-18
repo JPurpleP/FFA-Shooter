@@ -18,7 +18,7 @@ public class Footsteps : MonoBehaviour
     static readonly RaycastHit[] hits = new RaycastHit[6];
     static readonly Dictionary<Surface, AudioClip[]> clips = new();
     static readonly Dictionary<Mesh, int[]> submeshStarts = new();
-    static readonly bool logSteps = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ffasteplog") >= 0; // tests
+    static readonly bool logSteps = System.Array.IndexOf(CommandLine.Args, "-ffasteplog") >= 0; // tests
 
     public void Init(FpsPlayer p)
     {
@@ -122,7 +122,7 @@ public class Footsteps : MonoBehaviour
 
     // ------------------------------------------------------------------ sounds (generated, three of each)
 
-    static AudioClip[] Clips(Surface s)
+    public static AudioClip[] Clips(Surface s)
     {
         if (clips.TryGetValue(s, out var c)) return c;
         c = new AudioClip[3];

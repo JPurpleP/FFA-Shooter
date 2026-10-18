@@ -95,6 +95,55 @@ public static class BotNav
         return best;
     }
 
+    // A* scratch space, reused for every search (no per-search allocation: in browsers the old version, with a
+    // SortedSet and dictionaries per path, stalled frames when several bots re-planned at once).
+    static float[] gScore;
+    static int[] cameFrom, seen;
+    static int seenStamp;
+    static int[] heapNode = new int[256];
+    static float[] heapF = new float[256];
+    static int heapCount;
+
+    static void HeapPush(int node, float f)
+    {
+        if (heapCount == heapNode.Length)
+        {
+            System.Array.Resize(ref heapNode, heapCount * 2);
+            System.Array.Resize(ref heapF, heapCount * 2);
+        }
+        int i = heapCount++;
+        while (i > 0)
+        {
+            int parent = (i - 1) >> 1;
+            if (heapF[parent] <= f) break;
+            heapNode[i] = heapNode[parent];
+            heapF[i] = heapF[parent];
+            i = parent;
+        }
+        heapNode[i] = node;
+        heapF[i] = f;
+    }
+
+    static int HeapPop()
+    {
+        int top = heapNode[0];
+        int lastNode = heapNode[--heapCount];
+        float lastF = heapF[heapCount];
+        int i = 0;
+        while (true)
+        {
+            int c = (i << 1) + 1;
+            if (c >= heapCount) break;
+            if (c + 1 < heapCount && heapF[c + 1] < heapF[c]) c++;
+            if (heapF[c] >= lastF) break;
+            heapNode[i] = heapNode[c];
+            heapF[i] = heapF[c];
+            i = c;
+        }
+        if (heapCount > 0) { heapNode[i] = lastNode; heapF[i] = lastF; }
+        return top;
+    }
+
     /// <summary>A* over the graph. Returns waypoints ending at the destination, or a straight line if unreachable.</summary>
     public static List<Vector3> FindPath(Vector3 from, Vector3 to)
     {
@@ -103,36 +152,50 @@ public static class BotNav
         if (start < 0 || goal < 0)
             return new List<Vector3> { to };
 
-        var open = new SortedSet<(float f, int id)>(Comparer<(float f, int id)>.Create((x, y) => x.f != y.f ? x.f.CompareTo(y.f) : x.id.CompareTo(y.id)));
-        var g = new Dictionary<int, float> { [start] = 0f };
-        var came = new Dictionary<int, int>();
-        open.Add((Vector3.Distance(nodes[start], nodes[goal]), start));
-        int iterations = 0;
-        while (open.Count > 0 && iterations++ < 4000)
+        int count = nodes.Count;
+        if (gScore == null || gScore.Length < count)
         {
-            var cur = open.Min;
-            open.Remove(cur);
-            if (cur.id == goal)
+            gScore = new float[count];
+            cameFrom = new int[count];
+            seen = new int[count];
+            seenStamp = 0;
+        }
+        // seen[n] == stamp: visited this search (g and came valid); == -stamp: closed.
+        int stamp = ++seenStamp;
+        if (stamp == int.MaxValue) { System.Array.Clear(seen, 0, seen.Length); seenStamp = stamp = 1; }
+        Vector3 goalPos = nodes[goal];
+        heapCount = 0;
+        gScore[start] = 0f;
+        cameFrom[start] = -1;
+        seen[start] = stamp;
+        HeapPush(start, Vector3.Distance(nodes[start], goalPos));
+        int iterations = 0;
+        while (heapCount > 0 && iterations++ < 4000)
+        {
+            int cur = HeapPop();
+            if (seen[cur] == -stamp) continue; // already expanded (stale heap entry)
+            seen[cur] = -stamp;
+            if (cur == goal)
             {
                 var result = new List<Vector3> { to };
-                int n = goal;
-                while (came.TryGetValue(n, out int prev))
-                {
-                    result.Add(nodes[n]);
-                    n = prev;
-                }
+                for (int n = goal; n != start && n >= 0; n = cameFrom[n]) result.Add(nodes[n]);
                 result.Add(nodes[start]);
                 result.Reverse();
                 return result;
             }
-            foreach (int nb in links[cur.id])
+            Vector3 curPos = nodes[cur];
+            float curG = gScore[cur];
+            var nbs = links[cur];
+            for (int k = 0; k < nbs.Count; k++)
             {
-                float cost = g[cur.id] + Vector3.Distance(nodes[cur.id], nodes[nb]);
-                if (g.TryGetValue(nb, out float old) && old <= cost) continue;
-                if (g.ContainsKey(nb)) open.Remove((old + Vector3.Distance(nodes[nb], nodes[goal]), nb));
-                g[nb] = cost;
-                came[nb] = cur.id;
-                open.Add((cost + Vector3.Distance(nodes[nb], nodes[goal]), nb));
+                int nb = nbs[k];
+                if (seen[nb] == -stamp) continue;
+                float cost = curG + Vector3.Distance(curPos, nodes[nb]);
+                if (seen[nb] == stamp && gScore[nb] <= cost) continue;
+                gScore[nb] = cost;
+                cameFrom[nb] = cur;
+                seen[nb] = stamp;
+                HeapPush(nb, cost + Vector3.Distance(nodes[nb], goalPos));
             }
         }
         return new List<Vector3> { to };

@@ -10,7 +10,7 @@ using UnityEngine;
 public class Thunderstorm : MonoBehaviour
 {
     public const float Period = 240f, StormStart = 100f, StormLength = 90f, Ramp = 14f;
-    static readonly bool forced = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ffastorm") >= 0; // tests
+    static readonly bool forced = System.Array.IndexOf(CommandLine.Args, "-ffastorm") >= 0; // tests
 
     public static float Strength { get; private set; }
 

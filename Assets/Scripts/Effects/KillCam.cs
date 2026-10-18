@@ -29,7 +29,7 @@ public class KillCam : MonoBehaviour
     readonly List<FpsPlayer> gone = new();
     Coroutine playing;
     // What the current replay created or hid, so it can always be put back.
-    GameObject camGo, ghostRoot;
+    GameObject camGo, ghostRoot, gunGo;
     FpsPlayer hiddenKiller;
     Transform hiddenCorpse;
 
@@ -142,10 +142,11 @@ public class KillCam : MonoBehaviour
         if (hiddenKiller != null) hiddenKiller.SetHiddenForKillcam(false);
         if (hiddenCorpse != null) hiddenCorpse.gameObject.SetActive(true);
         if (ghostRoot != null) Destroy(ghostRoot);
-        if (camGo != null) Destroy(camGo);
+        if (gunGo != null) Destroy(gunGo);
+        if (camGo != null) camGo.SetActive(false); // kept for the next killcam (setting a camera up mid-match hitches)
         hiddenKiller = null;
         hiddenCorpse = null;
-        ghostRoot = camGo = null;
+        ghostRoot = gunGo = null;
     }
 
     IEnumerator Run(FpsPlayer victim, FpsPlayer killer, WeaponId weapon, Transform corpse, float deathTime)
@@ -163,21 +164,29 @@ public class KillCam : MonoBehaviour
         WeaponName = def != null ? def.Name : "";
 
         // Camera through the killer's eyes, holding their gun at the hip.
-        camGo = new GameObject("KillCamCamera");
-        var cam = camGo.AddComponent<Camera>();
+        // One camera, made the first time and reused: building a camera plus its post-processing mid-match
+        // stalled the frame (hundreds of ms in browsers).
+        if (camGo == null)
+        {
+            camGo = new GameObject("KillCamCamera");
+            camGo.AddComponent<Camera>();
+        }
+        camGo.SetActive(true);
+        var cam = camGo.GetComponent<Camera>();
         if (victim.playerCamera != null)
         {
             cam.CopyFrom(victim.playerCamera);
             cam.depth = victim.playerCamera.depth + 2f;
         }
         cam.cullingMask &= ~(1 << GameAssets.ViewModelLayer);
-        GraphicsQuality.AddTo(cam); // same color grading / AO as the game view
+        GraphicsQuality.AddTo(cam); // same color grading / AO as the game view (once)
         cam.fieldOfView = GameSettings.Fov;
         cam.nearClipPlane = 0.03f;
         Transform gunT = null;
         if (def != null && weapon != WeaponId.Fists && weapon != WeaponId.Melee)
         {
             var gun = WeaponModel.Build(weapon, cam.transform);
+            gunGo = gun.gameObject;
             gunT = gun.transform;
             gun.transform.localPosition = def.HipOffset;
             foreach (var r in gun.GetComponentsInChildren<Renderer>())

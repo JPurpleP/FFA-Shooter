@@ -95,8 +95,7 @@ public class WeaponPickup : NetworkBehaviour
         glow.renderMode = LightRenderMode.ForceVertex; // ~70 of these per map: per-pixel would redraw everything near them
 
         // Glowing ring on the floor beneath it.
-        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        DestroyImmediate(ring.GetComponent<Collider>());
+        var ring = Prims.Make(PrimitiveType.Cylinder);
         ring.name = "Ring";
         ring.transform.SetParent(visual.parent, false);
         ring.transform.localPosition = new Vector3(0f, 0.02f, 0f);

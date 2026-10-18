@@ -21,6 +21,20 @@ public static class RelayConnect
     /// <summary>Join code of the online match we're in (hosting or joined), or "" for direct-IP games / the menu.</summary>
     public static string Code { get; private set; } = "";
 
+    /// <summary>Browsers can only open WebSockets; desktop uses DTLS over UDP. Relay bridges the two.</summary>
+#if UNITY_WEBGL && !UNITY_EDITOR
+    const string ConnectionType = "wss";
+#else
+    const string ConnectionType = "dtls";
+#endif
+
+    static void Configure(UnityTransport transport)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        transport.UseWebSockets = true;
+#endif
+    }
+
     static Task signIn;
 
     /// <summary>Relay join codes are 6 letters/digits; anything with a dot or colon is an address.</summary>
@@ -32,7 +46,8 @@ public static class RelayConnect
         await EnsureSignedIn();
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(MaxClients);
         string code = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
-        transport.SetRelayServerData(allocation.ToRelayServerData("dtls"));
+        Configure(transport);
+        transport.SetRelayServerData(allocation.ToRelayServerData(ConnectionType));
         Code = code.ToUpperInvariant();
         return Code;
     }
@@ -43,7 +58,8 @@ public static class RelayConnect
         await EnsureSignedIn();
         code = code.Trim().ToUpperInvariant();
         JoinAllocation allocation = await RelayService.Instance.JoinAllocationAsync(code);
-        transport.SetRelayServerData(allocation.ToRelayServerData("dtls"));
+        Configure(transport);
+        transport.SetRelayServerData(allocation.ToRelayServerData(ConnectionType));
         Code = code;
     }
 
@@ -68,7 +84,7 @@ public static class RelayConnect
 
     static string CommandLineProfile()
     {
-        var args = Environment.GetCommandLineArgs();
+        var args = CommandLine.Args;
         int i = Array.IndexOf(args, "-ffaprofile");
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
     }

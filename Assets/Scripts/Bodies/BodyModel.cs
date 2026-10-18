@@ -118,20 +118,14 @@ public class BodyModel : MonoBehaviour
 
         Renderer Visual(Transform part, PrimitiveType type, Vector3 center, Vector3 scale, Color color, Material mat = null, Vector3 euler = default)
         {
-            var go = GameObject.CreatePrimitive(type);
-            Object.DestroyImmediate(go.GetComponent<Collider>());
+            var go = Prims.Make(type);
             go.transform.SetParent(part, false);
             go.transform.localPosition = center;
             go.transform.localRotation = Quaternion.Euler(euler);
             go.transform.localScale = scale;
             var r = go.GetComponent<Renderer>();
             r.sharedMaterial = mat != null ? mat : (mannequin ? a.mannequin : a.playerBody);
-            if (mat == null)
-            {
-                var block = new MaterialPropertyBlock();
-                block.SetColor("_Color", color);
-                r.SetPropertyBlock(block);
-            }
+            if (mat == null) Prims.Tint(r, color);
             return r;
         }
 

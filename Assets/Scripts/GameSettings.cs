@@ -23,6 +23,7 @@ public static class GameSettings
     public static bool CrosshairOutline;
     public static float PadSensitivity = 1f; // controller look speed
     public static bool AimAssist = true;     // controller only: slower look while on an enemy
+    public static int LobbyBots = 0, LobbyBotDifficulty = 1; // bots the host adds to an online game (0-8), Easy/Normal/Hard
     public static int PracticeBots = 5, PracticeDifficulty = 1, PracticeMode = 0, PracticeScore = 25; // Practice tab
     public static int FragLimit = 25;
     public static bool PublicGame = true; // list hosted games in Find Game
@@ -38,16 +39,18 @@ public static class GameSettings
         InvertY = PlayerPrefs.GetInt("ffa.inverty", 0) != 0;
         Fov = PlayerPrefs.GetFloat("ffa.fov", 75f);
         Volume = PlayerPrefs.GetFloat("ffa.volume", 1f);
-        GoreLevel = PlayerPrefs.GetFloat("ffa.gore", 2f);
+        GoreLevel = PlayerPrefs.GetFloat("ffa.gore", Application.platform == RuntimePlatform.WebGLPlayer ? 1f : 2f); // browsers: lighter by default
         Map = Mathf.Max(0, PlayerPrefs.GetInt("ffa.map", 0));
         VSync = PlayerPrefs.GetInt("ffa.vsync", 1) != 0;
-        Graphics = Mathf.Clamp(PlayerPrefs.GetInt("ffa.graphics", 2), 0, 2);
+        Graphics = Mathf.Clamp(PlayerPrefs.GetInt("ffa.graphics", Application.platform == RuntimePlatform.WebGLPlayer ? 1 : 2), 0, 2);
         VoiceMode = Mathf.Clamp(PlayerPrefs.GetInt("ffa.voice", 1), 0, 2);
         VoiceVolume = PlayerPrefs.GetFloat("ffa.voicevol", 1f);
         MicGain = PlayerPrefs.GetFloat("ffa.micgain", 1f);
         VoiceGate = PlayerPrefs.GetFloat("ffa.voicegate", 0.02f);
         MicDevice = PlayerPrefs.GetString("ffa.mic", "");
         PracticeBots = Mathf.Clamp(PlayerPrefs.GetInt("ffa.pbots", 5), 1, 11);
+        LobbyBots = Mathf.Clamp(PlayerPrefs.GetInt("ffa.lbots", 0), 0, 8);
+        LobbyBotDifficulty = Mathf.Clamp(PlayerPrefs.GetInt("ffa.lbotdiff", 1), 0, 2);
         CrosshairStyle = Mathf.Clamp(PlayerPrefs.GetInt("ffa.xhair", 1), 0, 3);
         CrosshairColor = Mathf.Clamp(PlayerPrefs.GetInt("ffa.xcolor", 0), 0, 5);
         CrosshairSize = PlayerPrefs.GetFloat("ffa.xsize", 1f);
@@ -85,6 +88,8 @@ public static class GameSettings
         PlayerPrefs.SetFloat("ffa.voicegate", VoiceGate);
         PlayerPrefs.SetString("ffa.mic", MicDevice);
         PlayerPrefs.SetInt("ffa.pbots", PracticeBots);
+        PlayerPrefs.SetInt("ffa.lbots", LobbyBots);
+        PlayerPrefs.SetInt("ffa.lbotdiff", LobbyBotDifficulty);
         PlayerPrefs.SetInt("ffa.xhair", CrosshairStyle);
         PlayerPrefs.SetInt("ffa.xcolor", CrosshairColor);
         PlayerPrefs.SetFloat("ffa.xsize", CrosshairSize);

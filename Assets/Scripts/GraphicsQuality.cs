@@ -9,24 +9,41 @@ public static class GraphicsQuality
 {
     public static readonly string[] Names = { "LOW", "MEDIUM", "HIGH" };
 
+    /// <summary>Running in a browser: every draw call and pixel costs more, so the settings lean lighter.</summary>
+    public static bool Web => Application.platform == RuntimePlatform.WebGLPlayer;
+
     public static void Apply()
     {
         int q = GameSettings.Graphics;
         QualitySettings.shadowDistance = ShadowDistance;
-        QualitySettings.shadowCascades = q == 0 ? 2 : 4;
-        QualitySettings.shadowResolution = q == 2 ? ShadowResolution.VeryHigh : ShadowResolution.High;
+        QualitySettings.shadows = Web && q == 0 ? ShadowQuality.Disable : ShadowQuality.All;
+        QualitySettings.shadowCascades = Web ? (q == 2 ? 2 : 1) : q == 0 ? 2 : 4;
+        QualitySettings.shadowResolution = q == 2 && !Web ? ShadowResolution.VeryHigh : Web && q < 2 ? ShadowResolution.Medium : ShadowResolution.High;
         // Each per-pixel point light draws every object it touches again (forward rendering), so keep few:
         // the extra ones (muzzle flashes, explosions) fall back to cheap per-vertex lighting.
-        QualitySettings.pixelLightCount = q == 0 ? 1 : q == 1 ? 2 : 3;
+        QualitySettings.pixelLightCount = Web ? (q == 2 ? 1 : 0) : q == 0 ? 1 : q == 1 ? 2 : 3;
+        if (Web) QualitySettings.antiAliasing = 0; // MSAA is expensive in WebGL; the low-poly look holds up without it
         foreach (var layer in Object.FindObjectsByType<PostProcessLayer>(FindObjectsInactive.Include))
             Configure(layer);
-        // Ambient occlusion lives in the map profiles: on only at High.
         foreach (var volume in Object.FindObjectsByType<PostProcessVolume>(FindObjectsInactive.Include))
-            if (volume.sharedProfile != null && volume.sharedProfile.TryGetSettings<AmbientOcclusion>(out var ao))
-                ao.active = q >= 2;
+        {
+            if (volume.sharedProfile == null) continue;
+            // Ambient occlusion: High only (and never in browsers: it needs compute shaders).
+            if (volume.sharedProfile.TryGetSettings<AmbientOcclusion>(out var ao)) ao.active = q >= 2 && SystemInfo.supportsComputeShaders;
+            // Bloom is several full-screen passes: browsers keep it for High only.
+            if (volume.sharedProfile.TryGetSettings<Bloom>(out var bloom)) bloom.active = !Web || q >= 2;
+        }
+        // Browsers: don't draw much past where the fog has eaten everything anyway.
+        if (Web)
+            foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
+                if (cam.farClipPlane > WebFarClip) cam.farClipPlane = WebFarClip;
     }
 
-    public static float ShadowDistance => GameSettings.Graphics == 0 ? 60f : GameSettings.Graphics == 1 ? 110f : 170f;
+    const float WebFarClip = 320f;
+
+    public static float ShadowDistance => Web
+        ? (GameSettings.Graphics == 0 ? 0f : GameSettings.Graphics == 1 ? 45f : 80f)
+        : GameSettings.Graphics == 0 ? 60f : GameSettings.Graphics == 1 ? 110f : 170f;
     /// <summary>How much rain / snow the storms spawn: lighter on Low and Medium.</summary>
     public static float StormParticles => GameSettings.Graphics == 0 ? 0.35f : GameSettings.Graphics == 1 ? 0.65f : 1f;
 

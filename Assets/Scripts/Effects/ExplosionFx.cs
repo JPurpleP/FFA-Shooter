@@ -35,8 +35,7 @@ public static class ExplosionFx
         Emit(fire, 32, 80f);
 
         // Core flash card.
-        var flash = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        Object.DestroyImmediate(flash.GetComponent<Collider>());
+        var flash = Prims.Make(PrimitiveType.Quad);
         flash.transform.position = at;
         flash.transform.localScale = Vector3.one * 5f * scale;
         var fr = flash.GetComponent<Renderer>();

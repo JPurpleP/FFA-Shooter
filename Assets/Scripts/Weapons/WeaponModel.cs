@@ -1171,8 +1171,7 @@ public class WeaponModel : MonoBehaviour
 
         Transform Make(PrimitiveType type, Transform parent, string name, Vector3 center, Vector3 scale, Quaternion rot, Material mat)
         {
-            var go = GameObject.CreatePrimitive(type);
-            Object.DestroyImmediate(go.GetComponent<Collider>());
+            var go = Prims.Make(type);
             go.name = name;
             var t = go.transform;
             t.SetParent(parent != null ? parent : root, false);

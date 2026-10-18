@@ -139,7 +139,7 @@ public partial class GameUI : MonoBehaviour
         float cx = w / 2f, yaw = me.Yaw;
         Fill(new Rect(cx - width / 2f, y, width, 22f), new Color(0f, 0f, 0f, 0.25f));
         var tick = new Color(1f, 1f, 1f, 0.55f);
-        var style = new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold };
+        var style = St(centerLabel, fontSize: 12, fontStyle: FontStyle.Bold);
         for (int deg = 0; deg < 360; deg += 15)
         {
             float d = Mathf.DeltaAngle(yaw, deg);
@@ -170,7 +170,7 @@ public partial class GameUI : MonoBehaviour
             return new Vector2(sp.x / scale, (Screen.height - sp.y) / scale);
         }
         var espColor = Accessible(new Color(0.35f, 1f, 0.5f, 0.95f));
-        var nameStyle = new GUIStyle(centerLabel) { fontSize = 13, fontStyle = FontStyle.Bold };
+        var nameStyle = St(centerLabel, fontSize: 13, fontStyle: FontStyle.Bold);
         foreach (var p in FpsPlayer.All)
         {
             if (!me.IsEnemyOf(p)) continue;
@@ -219,13 +219,13 @@ public partial class GameUI : MonoBehaviour
         if (me.SpawnProtected)
         {
             float left = me.SpawnProtectLeft;
-            Shadowed(new Rect(0, h * 0.62f, w, 26), $"<b>SPAWN PROTECTION</b>  {left:0.0}s", new GUIStyle(centerLabel) { fontSize = 18 }, ProtectColor);
-            Shadowed(new Rect(0, h * 0.62f + 24, w, 20), "Moving or firing ends it", new GUIStyle(centerLabel) { fontSize = 13 }, new Color(1f, 1f, 1f, 0.7f));
+            Shadowed(new Rect(0, h * 0.62f, w, 26), $"<b>SPAWN PROTECTION</b>  {left:0.0}s", St(centerLabel, fontSize: 18), ProtectColor);
+            Shadowed(new Rect(0, h * 0.62f + 24, w, 20), "Moving or firing ends it", St(centerLabel, fontSize: 13), new Color(1f, 1f, 1f, 0.7f));
             Fill(new Rect(w / 2 - 80, h * 0.62f + 48, 160 * left / FpsPlayer.SpawnProtectSeconds, 3), ProtectColor);
         }
         var cam = me.playerCamera;
         if (cam == null) return;
-        var tag = new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold };
+        var tag = St(centerLabel, fontSize: 12, fontStyle: FontStyle.Bold);
         foreach (var p in FpsPlayer.All)
         {
             if (!me.IsEnemyOf(p) || !p.SpawnProtected) continue;
@@ -389,6 +389,7 @@ public partial class GameUI : MonoBehaviour
         Net.OnClientDisconnectCallback += OnClientDisconnect;
         GraphicsQuality.Apply();
         VoiceChat.Ensure();
+        Prewarm.Begin(); // synthesise every sound now (in the menu) instead of on first use mid-match
         UpdateCheck.Begin();
         GamepadDriver.Ensure();
         // Same-version games only: clients send their version, the host turns away anyone else.
@@ -396,7 +397,7 @@ public partial class GameUI : MonoBehaviour
         Net.NetworkConfig.ConnectionData = UpdateCheck.Payload;
         Net.ConnectionApprovalCallback = UpdateCheck.Approve;
 
-        var args = Environment.GetCommandLineArgs();
+        var args = CommandLine.Args;
         string Arg(string flag) { int i = Array.IndexOf(args, flag); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
         if (Arg("-ffaname") is { } n) LocalPlayerName = n;
         if (Arg("-ffaport") is { } p) port = p;
@@ -447,6 +448,7 @@ public partial class GameUI : MonoBehaviour
             InspectEuler = new Vector3(ix, iy, iz);
         }
         ReloadTest = args.Contains("-ffareloadtest");
+        if (int.TryParse(Arg("-ffalobbybots"), out int lb)) GameSettings.LobbyBots = Mathf.Clamp(lb, 0, 8); // tests (not saved)
         if (float.TryParse(Arg("-ffafov"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float tf)) GameSettings.Fov = tf; // tests (not saved)
         if (int.TryParse(Arg("-ffagraphics"), out int gfx)) { GameSettings.Graphics = Mathf.Clamp(gfx, 0, 2); GraphicsQuality.Apply(); }
         if (float.TryParse(Arg("-ffabench"), out float benchSeconds)) FrameBench.Begin(benchSeconds);
@@ -458,7 +460,7 @@ public partial class GameUI : MonoBehaviour
             MapCatalog.Apply(HostMap);
         }
         if (args.Contains("-ffapractice"))
-            StartPractice();
+            StartCoroutine(PracticeWhenWarm()); // tests: like a real player, start once the warm-up is done
         else if (args.Contains("-ffahost") || args.Contains("-ffarelay"))
             Host(args.Contains("-ffarelay"), lobby: args.Contains("-ffalobby")); // test sessions skip the lobby unless asked
         else if (Arg("-ffaclient") is { } ip)
@@ -647,22 +649,33 @@ public partial class GameUI : MonoBehaviour
 
     /// <summary>This session is an offline practice match against bots.</summary>
     public static bool Practice { get; private set; }
-    static readonly string[] BotNames =
+    public static readonly string[] BotNames =
     {
         "Sarge", "Moose", "Rook", "Viper", "Gizmo", "Tank", "Ghost", "Biscuit", "Maverick", "Pickles", "Duke", "Nova",
     };
     public static readonly string[] Difficulties = { "EASY", "NORMAL", "HARD" };
-    static readonly float[] DifficultyAccuracy = { 0.25f, 0.5f, 0.8f };
+    public static readonly float[] DifficultyAccuracy = { 0.25f, 0.5f, 0.8f };
 
-    /// <summary>Offline match against bots: a local-only host (no Relay, not listed), bots fill the lobby, go.</summary>
-    void StartPractice()
+    /// <summary>Offline match against bots: a local-only host (no Relay, not listed), bots fill the lobby, go.
+    /// In the browser it hosts through Relay instead (browsers can't open a local server); still not listed.</summary>
+    async void StartPractice()
     {
         if (connecting || InSession) return;
         LocalPlayerName = SanitizeName(GameSettings.Name);
         MapCatalog.Apply(HostMap);
         RelayConnect.ClearCode();
         var transport = Net.GetComponent<UnityTransport>();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        connecting = true;
+        status = "Starting practice…";
+        try { await RelayConnect.PrepareHost(transport); }
+        catch (Exception e) { status = RelayConnect.Describe(e); return; }
+        finally { connecting = false; }
+        RelayConnect.ClearCode(); // nobody else is meant to join
+#else
         transport.SetConnectionData("127.0.0.1", FreeUdpPort(), "127.0.0.1"); // nobody else can reach it
+        await System.Threading.Tasks.Task.CompletedTask;
+#endif
         MatchRules.BeginSession(true);
         MatchRules.SetFragLimit(GameSettings.PracticeScore);
         MatchRules.SetMode((MatchRules.GameMode)(modeOverride >= 0 ? modeOverride : GameSettings.PracticeMode));
@@ -695,6 +708,13 @@ public partial class GameUI : MonoBehaviour
         MatchRules.StartMatch();
     }
 
+    System.Collections.IEnumerator PracticeWhenWarm()
+    {
+        float give = Time.unscaledTime + 60f;
+        while (!Prewarm.Done && Time.unscaledTime < give) yield return null;
+        StartPractice();
+    }
+
     static ushort FreeUdpPort()
     {
         using var u = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
@@ -717,7 +737,7 @@ public partial class GameUI : MonoBehaviour
         winner = "";
         status = "";
         lobbyBusyUntil = 0f;
-        if (Practice) DevSettings.BotAccuracy = 0.5f;
+        DevSettings.BotAccuracy = 0.5f; // practice / lobby bots set their own
         Spectator.Stop();
         Practice = false;
     }
@@ -788,9 +808,9 @@ public partial class GameUI : MonoBehaviour
         if (white != null) return;
         white = Texture2D.whiteTexture;
         label = new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true };
-        bigLabel = new GUIStyle(label) { fontSize = 34, fontStyle = FontStyle.Bold };
-        centerLabel = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter };
-        hugeLabel = new GUIStyle(centerLabel) { fontSize = 40, fontStyle = FontStyle.Bold };
+        bigLabel = St(label, fontSize: 34, fontStyle: FontStyle.Bold);
+        centerLabel = St(label, alignment: TextAnchor.MiddleCenter);
+        hugeLabel = St(centerLabel, fontSize: 40, fontStyle: FontStyle.Bold);
         boxStyle = new GUIStyle(GUI.skin.box);
     }
 
@@ -820,17 +840,17 @@ public partial class GameUI : MonoBehaviour
         Fill(new Rect(0, 0, w, 56), new Color(0f, 0f, 0f, 0.8f));
         Fill(new Rect(0, h - 64, w, 64), new Color(0f, 0f, 0f, 0.8f));
         Fill(new Rect(0, 56, w, 2), new Color(1f, 0.3f, 0.3f, 0.8f));
-        Shadowed(new Rect(30, 10, 400, 36), KillCam.IsFinal ? "<b>FINAL KILL</b>" : "<b>KILLCAM</b>", new GUIStyle(label) { fontSize = 26 },
+        Shadowed(new Rect(30, 10, 400, 36), KillCam.IsFinal ? "<b>FINAL KILL</b>" : "<b>KILLCAM</b>", St(label, fontSize: 26),
             KillCam.IsFinal ? new Color(1f, 0.82f, 0.3f) : new Color(1f, 0.3f, 0.3f));
         float remaining = Mathf.Max(0f, FpsPlayer.RespawnDelay - (Time.time - deathTime));
         if (!KillCam.IsFinal)
-            Shadowed(new Rect(w - 330, 16, 300, 26), $"Respawning in {remaining:0.0}", new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = 16 }, new Color(1f, 1f, 1f, 0.8f));
+            Shadowed(new Rect(w - 330, 16, 300, 26), $"Respawning in {remaining:0.0}", St(label, alignment: TextAnchor.MiddleRight, fontSize: 16), new Color(1f, 1f, 1f, 0.8f));
         else if (!string.IsNullOrEmpty(winner))
-            Shadowed(new Rect(w - 430, 16, 400, 26), $"{winner} WINS", new GUIStyle(label) { alignment = TextAnchor.MiddleRight, fontSize = 18, fontStyle = FontStyle.Bold }, new Color(1f, 0.85f, 0.25f));
+            Shadowed(new Rect(w - 430, 16, 400, 26), $"{winner} WINS", St(label, alignment: TextAnchor.MiddleRight, fontSize: 18, fontStyle: FontStyle.Bold), new Color(1f, 0.85f, 0.25f));
         string killerHex = ColorUtility.ToHtmlStringRGB(KillCam.KillerColor);
-        Shadowed(new Rect(0, h - 58, w, 22), KillCam.IsFinal ? "WINNING KILL BY" : "KILLED BY", new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold }, new Color(1f, 1f, 1f, 0.6f));
+        Shadowed(new Rect(0, h - 58, w, 22), KillCam.IsFinal ? "WINNING KILL BY" : "KILLED BY", St(centerLabel, fontSize: 12, fontStyle: FontStyle.Bold), new Color(1f, 1f, 1f, 0.6f));
         Shadowed(new Rect(0, h - 38, w, 30), $"<color=#{killerHex}>■</color> <b>{KillCam.KillerName}</b>   <size=14>{KillCam.WeaponName}</size>",
-            new GUIStyle(centerLabel) { fontSize = 20 }, Color.white);
+            St(centerLabel, fontSize: 20), Color.white);
         Fill(new Rect(0, h - 3, w * KillCam.Progress, 3), new Color(1f, 0.3f, 0.3f, 0.9f));
         float c2 = w / 2, cy2 = h / 2; // the killer's crosshair
         var ch = new Color(1f, 1f, 1f, 0.85f * (1f - KillCam.AdsAmount)); // fades out on the sights
@@ -920,7 +940,7 @@ public partial class GameUI : MonoBehaviour
         damageNumbers.RemoveAll(d => t - d.time > 1.2f);
         if (DevSettings.ShowDamageNumbers && me.playerCamera != null)
         {
-            var dmgStyle = new GUIStyle(centerLabel) { fontSize = 18, fontStyle = FontStyle.Bold };
+            var dmgStyle = St(centerLabel, fontSize: 18, fontStyle: FontStyle.Bold);
             foreach (var d in damageNumbers)
             {
                 float age = t - d.time;
@@ -977,8 +997,8 @@ public partial class GameUI : MonoBehaviour
             Fill(new Rect(32, h - 22, 160 * me.Health.Value / (float)FpsPlayer.MaxHealth, 6), hpColor);
 
             // Weapon slots and ammo
-            var right = new GUIStyle(label) { alignment = TextAnchor.UpperRight };
-            var ammoStyle = new GUIStyle(bigLabel) { alignment = TextAnchor.UpperRight };
+            var right = St(label, alignment: TextAnchor.UpperRight);
+            var ammoStyle = St(bigLabel, alignment: TextAnchor.UpperRight);
             if (me.InDuel)
             {
                 // Golden duel: fists, the opponent's health and the sudden-death clock.
@@ -1038,7 +1058,7 @@ public partial class GameUI : MonoBehaviour
             Shadowed(new Rect(w - 530, h - 126, 500, 24), throwText, right,
                 throwActive ? Color.white : parts.Count > 0 ? new Color(0.8f, 0.9f, 0.7f, 0.8f) : new Color(1f, 1f, 1f, 0.35f));
             if (me.Snared)
-                Shadowed(new Rect(0, h / 2 + 90, w, 30), $"<b>SNARED</b>  {me.SnareSecondsLeft:0.0}s", new GUIStyle(centerLabel) { fontSize = 20 }, new Color(0.95f, 0.7f, 0.35f));
+                Shadowed(new Rect(0, h / 2 + 90, w, 30), $"<b>SNARED</b>  {me.SnareSecondsLeft:0.0}s", St(centerLabel, fontSize: 20), new Color(0.95f, 0.7f, 0.35f));
             if (me.IsCookingGrenade)
                 Shadowed(new Rect(0, h / 2 + 30, w, 26), $"COOKING  {me.CookTimeLeft:0.0}", centerLabel, me.CookTimeLeft < 1f ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.8f, 0.3f));
         }
@@ -1077,7 +1097,7 @@ public partial class GameUI : MonoBehaviour
         }
 
         // Kill feed
-        var feedStyle = new GUIStyle(label) { alignment = TextAnchor.UpperRight, fontSize = 14 };
+        var feedStyle = St(label, alignment: TextAnchor.UpperRight, fontSize: 14);
         float y = 40;
         foreach (var (text, time) in killFeed)
         {
@@ -1137,16 +1157,16 @@ public partial class GameUI : MonoBehaviour
         }
         Fill(new Rect(0, h - 92, w, 92), new Color(0f, 0f, 0f, 0.55f));
         Fill(new Rect(0, h - 92, w, 2), new Color(target.PlayerColor.r, target.PlayerColor.g, target.PlayerColor.b, 0.9f));
-        Shadowed(new Rect(0, h - 86, w, 18), "<b>SPECTATING</b>  ·  you're out of lives", new GUIStyle(centerLabel) { fontSize = 12 }, new Color(1f, 1f, 1f, 0.6f));
+        Shadowed(new Rect(0, h - 86, w, 18), "<b>SPECTATING</b>  ·  you're out of lives", St(centerLabel, fontSize: 12), new Color(1f, 1f, 1f, 0.6f));
         string hex = ColorUtility.ToHtmlStringRGB(target.PlayerColor);
         var def = target.CurrentDef;
         Shadowed(new Rect(0, h - 66, w, 30),
             $"<color=#{hex}>■</color> <b>{target.DisplayName}</b>   <size=15>{Mathf.Max(0, target.Health.Value)} HP  ·  {(def != null ? def.Name : "Fists")}  ·  {target.Kills.Value} kills</size>",
-            new GUIStyle(centerLabel) { fontSize = 22 }, Color.white);
+            St(centerLabel, fontSize: 22), Color.white);
         bool pad = UnityEngine.InputSystem.Gamepad.current != null && GamepadInput.UsingGamepad;
         string keys = pad ? "LB / RB  switch player   ·   Y  " : $"Click / right-click  switch player   ·   {Bindings.Label(GameAction.Jump)}  ";
         Shadowed(new Rect(0, h - 32, w, 22), keys + (Spectator.FirstPerson ? "third-person view" : "first-person view"),
-            new GUIStyle(centerLabel) { fontSize = 13 }, new Color(1f, 1f, 1f, 0.7f));
+            St(centerLabel, fontSize: 13), new Color(1f, 1f, 1f, 0.7f));
     }
 
     void DrawScope(float w, float h)
@@ -1193,14 +1213,14 @@ public partial class GameUI : MonoBehaviour
         var r = new Rect(w / 2 - bw / 2, Mathf.Max(70f, h / 2 - bh / 2), bw, bh);
         Fill(r, new Color(0.03f, 0.04f, 0.06f, 0.82f));
         Fill(new Rect(r.x, r.y, bw, 3), new Color(1f, 0.82f, 0.3f, 0.9f));
-        Shadowed(new Rect(r.x + 20, r.y + 12, 300, 30), "<b>LEADERBOARD</b>", new GUIStyle(label) { fontSize = 20 }, Color.white);
+        Shadowed(new Rect(r.x + 20, r.y + 12, 300, 30), "<b>LEADERBOARD</b>", St(label, fontSize: 20), Color.white);
         string codeText = RelayConnect.Code != "" ? $"Join code <b>{RelayConnect.Code}</b>   ·   " : "";
         Shadowed(new Rect(r.x + bw - 380, r.y + 16, 360, 24), $"{codeText}{ModeGoal}",
-            new GUIStyle(label) { alignment = TextAnchor.UpperRight, fontSize = 14 }, new Color(1f, 1f, 1f, 0.7f));
+            St(label, alignment: TextAnchor.UpperRight, fontSize: 14), new Color(1f, 1f, 1f, 0.7f));
 
         float hy = r.y + 52;
-        var head = new GUIStyle(label) { fontSize = 12, fontStyle = FontStyle.Bold };
-        var headR = new GUIStyle(head) { alignment = TextAnchor.UpperRight };
+        var head = St(label, fontSize: 12, fontStyle: FontStyle.Bold);
+        var headR = St(head, alignment: TextAnchor.UpperRight);
         var c = new Color(1f, 1f, 1f, 0.55f);
         Shadowed(new Rect(r.x + 20, hy, 40, 20), "#", head, c);
         Shadowed(new Rect(r.x + 56, hy, 200, 20), "PLAYER", head, c);
@@ -1209,8 +1229,8 @@ public partial class GameUI : MonoBehaviour
         Shadowed(new Rect(r.x + 420, hy, 60, 20), ModeColumnTitle, headR, c);
         Fill(new Rect(r.x + 16, hy + 22, bw - 32, 1), new Color(1f, 1f, 1f, 0.15f));
 
-        var cell = new GUIStyle(label) { fontSize = 15 };
-        var cellR = new GUIStyle(cell) { alignment = TextAnchor.UpperRight };
+        var cell = St(label, fontSize: 15);
+        var cellR = St(cell, alignment: TextAnchor.UpperRight);
         float y = hy + 30;
         int rank = 0, prevKills = int.MinValue, shown = 0;
         foreach (var p in players)
@@ -1226,7 +1246,7 @@ public partial class GameUI : MonoBehaviour
             Shadowed(new Rect(r.x + 74, y, 220, 24), name, cell, p.IsDead ? new Color(1f, 1f, 1f, 0.5f) : Color.white);
             Shadowed(new Rect(r.x + 300, y, 50, 24), p.Kills.Value.ToString(), cellR, Color.white);
             Shadowed(new Rect(r.x + 360, y, 60, 24), p.Deaths.Value.ToString(), cellR, Color.white);
-            Shadowed(new Rect(r.x + 410, y, 70, 24), ModeColumn(p), new GUIStyle(cellR) { richText = true }, Color.white);
+            Shadowed(new Rect(r.x + 410, y, 70, 24), ModeColumn(p), St(cellR, richText: true), Color.white);
             // Progress toward winning (per mode)
             float frac = Mathf.Clamp01(ModeProgress(p));
             Fill(new Rect(r.x + 496, y + 9, 44, 5), new Color(1f, 1f, 1f, 0.12f));
@@ -1254,7 +1274,7 @@ public partial class GameUI : MonoBehaviour
             Fill(new Rect(orect.x, orect.y, orect.width, 3), Accent);
             var inner = new Rect(orect.x + 30, orect.y + 20, orect.width - 60, orect.height - 90);
             DrawOptions(inner, "OPTIONS");
-            var back = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+            var back = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 16);
             if (GUI.Button(new Rect(orect.x + 30, orect.yMax - 62, 180, 44), "BACK", back)) { pauseOptions = false; rebinding = -1; }
             return;
         }
@@ -1272,9 +1292,9 @@ public partial class GameUI : MonoBehaviour
 
         if (online)
         {
-            GUI.Label(new Rect(x, y, 120, 34), "JOIN CODE", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleLeft });
-            GUI.Label(new Rect(x + 96, y - 2, 150, 38), $"<b>{RelayConnect.Code}</b>", new GUIStyle(h3Style) { fontSize = 24, richText = true });
-            var copyStyle = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 14 };
+            GUI.Label(new Rect(x, y, 120, 34), "JOIN CODE", St(smallStyle, alignment: TextAnchor.MiddleLeft));
+            GUI.Label(new Rect(x + 96, y - 2, 150, 38), $"<b>{RelayConnect.Code}</b>", St(h3Style, fontSize: 24, richText: true));
+            var copyStyle = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 14);
             if (GUI.Button(new Rect(x + iw - 110, y, 110, 34), Time.unscaledTime - codeCopiedTime < 1.5f ? "COPIED!" : "COPY", copyStyle))
             {
                 GUIUtility.systemCopyBuffer = RelayConnect.Code;
@@ -1283,13 +1303,13 @@ public partial class GameUI : MonoBehaviour
             y += 54;
         }
 
-        if (GUI.Button(new Rect(x, y, iw, 46), "OPTIONS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        if (GUI.Button(new Rect(x, y, iw, 46), "OPTIONS", St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 17)))
         {
             pauseOptions = true;
             confirmLeave = false;
         }
         y += 58;
-        if (GUI.Button(new Rect(x, y, iw, 46), Net.IsServer ? "PLAYERS  (MUTE / KICK)" : "PLAYERS  (MUTE)", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        if (GUI.Button(new Rect(x, y, iw, 46), Net.IsServer ? "PLAYERS  (MUTE / KICK)" : "PLAYERS  (MUTE)", St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 17)))
         {
             pausePlayers = true;
             confirmLeave = false;
@@ -1297,7 +1317,7 @@ public partial class GameUI : MonoBehaviour
         y += 58;
 
         float half = (iw - 12) / 2f;
-        var secondary = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+        var secondary = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 16);
         string leave = confirmLeave ? "CLICK TO CONFIRM" : Net.IsServer ? "END GAME" : "LEAVE GAME";
         if (GUI.Button(new Rect(x, r.yMax - 70, half, 48), leave, confirmLeave ? navActiveStyle : secondary))
         {
@@ -1325,10 +1345,10 @@ public partial class GameUI : MonoBehaviour
         Fill(r, new Color(0.04f, 0.05f, 0.07f, 0.94f));
         Fill(new Rect(r.x, r.y, r.width, 3), Accent);
         string dots = new string('.', 1 + (int)(Time.unscaledTime * 2f) % 3);
-        GUI.Label(new Rect(r.x, r.y + 30, r.width, 40), $"CONNECTING{dots}", new GUIStyle(h3Style) { alignment = TextAnchor.MiddleCenter, fontSize = 24 });
+        GUI.Label(new Rect(r.x, r.y + 30, r.width, 40), $"CONNECTING{dots}", St(h3Style, alignment: TextAnchor.MiddleCenter, fontSize: 24));
         GUI.Label(new Rect(r.x, r.y + 70, r.width, 24), RelayConnect.Code != "" ? $"Joining game {RelayConnect.Code}" : "Joining game",
-            new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter });
-        var cancel = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+            St(smallStyle, alignment: TextAnchor.MiddleCenter));
+        var cancel = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 16);
         if (GUI.Button(new Rect(r.x + 120, r.yMax - 62, 160, 42), "CANCEL", cancel))
             Disconnect();
     }

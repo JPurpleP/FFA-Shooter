@@ -547,8 +547,7 @@ public static class Gore
     static void Stump(Transform parent, Vector3 localPos, Vector3 localNormal, float size = 0.14f)
     {
         var a = GameAssets.I;
-        var meat = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        Object.DestroyImmediate(meat.GetComponent<Collider>());
+        var meat = Prims.Make(PrimitiveType.Sphere);
         meat.name = "Stump";
         meat.layer = GameAssets.DebrisLayer;
         meat.transform.SetParent(parent, false);
@@ -556,8 +555,7 @@ public static class Gore
         meat.transform.localRotation = Quaternion.FromToRotation(Vector3.up, localNormal);
         meat.transform.localScale = new Vector3(size, size * 0.45f, size);
         meat.GetComponent<Renderer>().sharedMaterial = a.gore;
-        var boneGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        Object.DestroyImmediate(boneGo.GetComponent<Collider>());
+        var boneGo = Prims.Make(PrimitiveType.Cylinder);
         boneGo.name = "Bone";
         boneGo.layer = GameAssets.DebrisLayer;
         boneGo.transform.SetParent(meat.transform, false);
@@ -596,8 +594,7 @@ public static class Gore
 
     static GameObject MakeQuad(string name, Vector3 point, Vector3 normal, float size, Material mat, float offset)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        Object.DestroyImmediate(go.GetComponent<Collider>());
+        var go = Prims.Make(PrimitiveType.Quad);
         go.name = name;
         go.layer = GameAssets.DebrisLayer;
         go.transform.SetPositionAndRotation(point + normal * offset, Quaternion.LookRotation(-normal) * Quaternion.Euler(0f, 0f, Random.Range(0f, 360f)));

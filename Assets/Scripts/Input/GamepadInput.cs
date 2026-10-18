@@ -42,7 +42,9 @@ public static class GamepadInput
             if (!synthetic) UsingGamepad = false;
         synthetic = false;
 
+#if !UNITY_WEBGL
         if (pad != null && !GameUI.CursorCaptured && Application.isFocused) DriveMenuPointer(pad);
+#endif
     }
 
     // ------------------------------------------------------------------ in game

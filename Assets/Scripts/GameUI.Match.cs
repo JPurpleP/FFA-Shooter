@@ -143,7 +143,7 @@ public partial class GameUI
         if (MatchRules.Mode != Mode.TeamDeathmatch && MatchRules.Mode != Mode.Infection) return;
         var cam = me.playerCamera;
         if (cam == null) return;
-        var style = new GUIStyle(centerLabel) { fontSize = 12, fontStyle = FontStyle.Bold };
+        var style = St(centerLabel, fontSize: 12, fontStyle: FontStyle.Bold);
         foreach (var p in FpsPlayer.All)
         {
             if (p == me || !p.IsSpawned || p.IsDead || p.InLobby.Value) continue;
@@ -176,14 +176,14 @@ public partial class GameUI
         bool won = MatchRules.LocalWon(winner);
         GUI.Label(new Rect(x, y, iw, 50), $"{winner} WINS!", new GUIStyle(h2Style) { fontSize = 34, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(1f, 0.85f, 0.25f) } });
         GUI.Label(new Rect(x, y + 48, iw, 22), won ? "VICTORY" : $"{MatchRules.ModeName(MatchRules.Mode).ToUpper()}  ·  {MapCatalog.NameOf(MapCatalog.Current).ToUpper()}",
-            new GUIStyle(subtitleStyle) { alignment = TextAnchor.MiddleCenter });
+            St(subtitleStyle, alignment: TextAnchor.MiddleCenter));
         y += 84;
 
         // Top players.
         float colW = (iw - 30) / 2f;
         GUI.Label(new Rect(x, y, colW, 20), "TOP PLAYERS", smallStyle);
         var players = ModeOrder(FpsPlayer.All.Where(p => p.IsSpawned).OrderByDescending(p => p.Kills.Value).ThenBy(p => p.Deaths.Value).ToList());
-        var row = new GUIStyle(bodyStyle) { fontSize = 15, wordWrap = false, clipping = TextClipping.Clip };
+        var row = St(bodyStyle, fontSize: 15, wordWrap: false, clipping: TextClipping.Clip);
         float ry = y + 26;
         for (int i = 0; i < players.Count && i < 6; i++)
         {
@@ -191,7 +191,7 @@ public partial class GameUI
             Fill(new Rect(x, ry, colW, 30), new Color(1f, 1f, 1f, p == me ? 0.12f : 0.04f));
             GUI.Label(new Rect(x + 10, ry + 4, 30, 22), (i + 1).ToString(), row);
             GUI.Label(new Rect(x + 36, ry + 4, colW - 170, 22), p.DisplayName + (p == me ? " <size=12>(you)</size>" : ""), row);
-            GUI.Label(new Rect(x + colW - 130, ry + 4, 120, 22), $"{p.Kills.Value} / {p.Deaths.Value}  {ModeColumn(p)}", new GUIStyle(row) { alignment = TextAnchor.MiddleRight });
+            GUI.Label(new Rect(x + colW - 130, ry + 4, 120, 22), $"{p.Kills.Value} / {p.Deaths.Value}  {ModeColumn(p)}", St(row, alignment: TextAnchor.MiddleRight));
             ry += 34;
         }
 
@@ -211,7 +211,7 @@ public partial class GameUI
         {
             Fill(new Rect(sx, sy, colW, 30), new Color(1f, 1f, 1f, 0.04f));
             GUI.Label(new Rect(sx + 10, sy + 4, colW / 2f, 22), name, row);
-            GUI.Label(new Rect(sx + colW / 2f, sy + 4, colW / 2f - 10, 22), $"<b>{value}</b>", new GUIStyle(row) { alignment = TextAnchor.MiddleRight });
+            GUI.Label(new Rect(sx + colW / 2f, sy + 4, colW / 2f - 10, 22), $"<b>{value}</b>", St(row, alignment: TextAnchor.MiddleRight));
             sy += 34;
         }
 
@@ -224,8 +224,8 @@ public partial class GameUI
             GUI.Label(new Rect(x, by - 24, iw, 20), "VOTE FOR THE NEXT MAP", smallStyle);
             int maps = Mathf.Min(MapCatalog.Count, 5);
             float mw = (iw - 8 * (maps - 1)) / maps;
-            var vs = new GUIStyle(mapButtonStyle) { fontSize = 12 };
-            var va = new GUIStyle(mapButtonActiveStyle) { fontSize = 12 };
+            var vs = St(mapButtonStyle, fontSize: 12);
+            var va = St(mapButtonActiveStyle, fontSize: 12);
             for (int i = 0; i < maps; i++)
             {
                 string text = $"{MapCatalog.NameOf(i).ToUpper()}  ({voteCounts[i]})";
@@ -237,6 +237,6 @@ public partial class GameUI
             }
         }
         GUI.Label(new Rect(x, r.yMax - 40, iw, 26), $"Next match in {Mathf.CeilToInt(left)}",
-            new GUIStyle(bodyStyle) { alignment = TextAnchor.MiddleCenter });
+            St(bodyStyle, alignment: TextAnchor.MiddleCenter));
     }
 }

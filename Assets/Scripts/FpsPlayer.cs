@@ -2061,8 +2061,7 @@ public class FpsPlayer : NetworkBehaviour
         var root = new GameObject("GrappleHook");
         void Piece(PrimitiveType type, Vector3 pos, Vector3 scale, Vector3 euler)
         {
-            var go = GameObject.CreatePrimitive(type);
-            DestroyImmediate(go.GetComponent<Collider>());
+            var go = Prims.Make(type);
             go.transform.SetParent(root.transform, false);
             go.transform.localPosition = pos;
             go.transform.localRotation = Quaternion.Euler(euler);

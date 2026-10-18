@@ -54,7 +54,7 @@ public static partial class ProjectBuilder
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
         {
             scenes = new[] { ScenePath },
-            locationPathName = "Builds/Profile/FFA-Shooter.exe",
+            locationPathName = "Builds/Profile/FluketownDM.exe",
             target = BuildTarget.StandaloneWindows64,
             options = BuildOptions.Development,
         });
@@ -65,13 +65,54 @@ public static partial class ProjectBuilder
             EditorApplication.Exit(report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
     }
 
+    /// <summary>Browser build for itch.io in Builds/WebGL (gzip with decompression fallback, so any host serves it).</summary>
+    /// <summary>Development WebGL build (profiler markers for -ffabench spike reports) in Builds/WebGLDev. No arena rebuild.</summary>
+    public static void BuildWebGLDev() => BuildWebGLTo("Builds/WebGLDev", BuildOptions.Development, false);
+
+    public static void BuildWebGL() => BuildWebGLTo("Builds/WebGL", BuildOptions.None, true);
+
+    static void BuildWebGLTo(string folder, BuildOptions options, bool rebuild)
+    {
+        if (rebuild) RebuildAll();
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+        PlayerSettings.WebGL.decompressionFallback = true;
+        PlayerSettings.WebGL.dataCaching = true;
+        PlayerSettings.WebGL.initialMemorySize = 512;
+        PlayerSettings.WebGL.maximumMemorySize = 4096;
+        PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
+        PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.WebGL, ManagedStrippingLevel.Minimal);
+        PlayerSettings.defaultWebScreenWidth = 1280;
+        PlayerSettings.defaultWebScreenHeight = 720;
+        // Static batching merges the unmoving scenery into few draw calls; WebGL pays a lot per draw call.
+        PlayerSettings.SetStaticBatchingForPlatform(BuildTarget.WebGL, true);
+        var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+        {
+            scenes = new[] { ScenePath },
+            locationPathName = folder,
+            target = BuildTarget.WebGL,
+            options = options,
+        });
+        // Render at 1:1 pixels: by default Unity scales the canvas by the screen's DPI (150% Windows scaling = 2.25x the pixels).
+        string page = folder + "/index.html";
+        if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded && System.IO.File.Exists(page))
+        {
+            string html = System.IO.File.ReadAllText(page);
+            const string marker = "      var script = document.createElement(\"script\");";
+            if (!html.Contains("config.devicePixelRatio = 1; // Fluketown") && html.Contains(marker))
+                System.IO.File.WriteAllText(page, html.Replace(marker, "      config.devicePixelRatio = 1; // Fluketown DM: 1:1 pixels (much faster on scaled screens)\n" + marker));
+        }
+        Debug.Log($"[FFA] Build result: {report.summary.result}, errors={report.summary.totalErrors}, size={report.summary.totalSize / (1024 * 1024)} MB");
+        if (Application.isBatchMode)
+            EditorApplication.Exit(report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
+    }
+
     public static void BuildWindows()
     {
         RebuildAll();
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
         {
             scenes = new[] { ScenePath },
-            locationPathName = "Builds/Windows/FFA-Shooter.exe",
+            locationPathName = "Builds/Windows/FluketownDM.exe",
             target = BuildTarget.StandaloneWindows64,
             options = BuildOptions.None,
         });

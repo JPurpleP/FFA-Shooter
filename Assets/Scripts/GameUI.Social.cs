@@ -70,7 +70,7 @@ public partial class GameUI
     void DrawChat(float w, float h)
     {
         float t = Time.time;
-        var style = new GUIStyle(label) { fontSize = 15, wordWrap = true };
+        var style = St(label, fontSize: 15, wordWrap: true);
         float x = 32, y = h * 0.42f, lineH = 21;
         int shown = 0;
         for (int i = chat.Count - 1; i >= 0 && shown < 8; i--)
@@ -98,7 +98,7 @@ public partial class GameUI
             }
             Fill(new Rect(x - 4, boxY - 2, 468, 34), new Color(0f, 0f, 0f, 0.5f));
             GUI.SetNextControlName("ChatInput");
-            chatText = GUI.TextField(new Rect(x, boxY, 460, 30), chatText, 100, new GUIStyle(fieldStyle) { fontSize = 15, padding = new RectOffset(8, 8, 4, 4) });
+            chatText = GUI.TextField(new Rect(x, boxY, 460, 30), chatText, 100, St(fieldStyle, fontSize: 15, padding: new RectOffset(8, 8, 4, 4)));
             if (Time.frameCount <= chatOpenFrame + 1) { chatText = ""; GUI.FocusControl("ChatInput"); }
             Shadowed(new Rect(x, boxY + 34, 460, 18), "<size=12>Enter to send · Esc to cancel</size>", label, new Color(1f, 1f, 1f, 0.6f));
         }
@@ -120,7 +120,7 @@ public partial class GameUI
         Fill(r, new Color(0.04f, 0.05f, 0.07f, 0.9f));
         Fill(new Rect(r.x, r.y, r.width, 3), Accent);
         GUI.Label(new Rect(r.x + 16, r.y + 14, r.width - 32, 24), "CHAT", h3Style);
-        var style = new GUIStyle(bodyStyle) { fontSize = 14, wordWrap = true, richText = true };
+        var style = St(bodyStyle, fontSize: 14, wordWrap: true, richText: true);
         float y = r.yMax - 64;
         for (int i = chat.Count - 1; i >= 0 && y > r.y + 50; i--)
         {
@@ -135,7 +135,7 @@ public partial class GameUI
         var e = Event.current;
         bool send = e.type == EventType.KeyDown && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) && GUI.GetNameOfFocusedControl() == "LobbyChat";
         GUI.SetNextControlName("LobbyChat");
-        lobbyChatText = GUI.TextField(new Rect(r.x + 16, r.yMax - 52, r.width - 110, 36), lobbyChatText, 100, new GUIStyle(fieldStyle) { fontSize = 14, padding = new RectOffset(8, 8, 4, 4) });
+        lobbyChatText = GUI.TextField(new Rect(r.x + 16, r.yMax - 52, r.width - 110, 36), lobbyChatText, 100, St(fieldStyle, fontSize: 14, padding: new RectOffset(8, 8, 4, 4)));
         if (GUI.Button(new Rect(r.xMax - 88, r.yMax - 52, 72, 36), "SEND", mapButtonStyle) || send)
         {
             SendChat(lobbyChatText);
@@ -163,8 +163,8 @@ public partial class GameUI
         float t = Time.time;
         medals.RemoveAll(x => t - x.time > 2.6f);
         float y = h * 0.62f;
-        var title = new GUIStyle(centerLabel) { fontSize = 26, fontStyle = FontStyle.Bold };
-        var sub = new GUIStyle(centerLabel) { fontSize = 13 };
+        var title = St(centerLabel, fontSize: 26, fontStyle: FontStyle.Bold);
+        var sub = St(centerLabel, fontSize: 13);
         for (int i = medals.Count - 1; i >= 0; i--)
         {
             var (m, at) = medals[i];
@@ -173,7 +173,7 @@ public partial class GameUI
             float pop = 1f + 0.25f * Mathf.Exp(-age * 14f); // punches in, settles
             var c = Medals.Tint(m);
             c.a = a;
-            var size = new GUIStyle(title) { fontSize = Mathf.RoundToInt(26 * pop) };
+            var size = St(title, fontSize: Mathf.RoundToInt(26 * pop));
             Shadowed(new Rect(0, y, w, 34), Medals.Name(m), size, c);
             Shadowed(new Rect(0, y + 30, w, 18), Medals.Detail(m), sub, new Color(1f, 1f, 1f, 0.75f * a));
             y += 56;
@@ -197,7 +197,7 @@ public partial class GameUI
     void DrawVoice(float w, float h)
     {
         if (GameSettings.VoiceMode == 0) return;
-        var style = new GUIStyle(label) { fontSize = 15 };
+        var style = St(label, fontSize: 15);
         float x = 32, y = h * 0.42f - 30;
         if (VoiceChat.Transmitting)
         {
@@ -229,7 +229,7 @@ public partial class GameUI
         GUI.Label(new Rect(x, y, iw, 40), "PLAYERS", h2Style);
         bool host = Net.IsServer;
         y += 56;
-        var row = new GUIStyle(bodyStyle) { fontSize = 16, wordWrap = false };
+        var row = St(bodyStyle, fontSize: 16, wordWrap: false);
         foreach (var p in FpsPlayer.All.ToArray())
         {
             if (!p.IsSpawned) continue;
@@ -243,7 +243,7 @@ public partial class GameUI
             if (p != FpsPlayer.Local && !p.IsBot.Value) MuteButton(p, new Rect(x + iw - 200, y + 3, 84, 28));
             y += 40;
         }
-        var back = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 16 };
+        var back = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 16);
         if (GUI.Button(new Rect(x, r.yMax - 64, 180, 44), "BACK", back)) pausePlayers = false;
     }
 
@@ -284,7 +284,7 @@ public partial class GameUI
         GUI.Label(new Rect(r.x + 370, y, 150, 20), "MODE", head);
         GUI.Label(new Rect(r.x + 520, y, 80, 20), "PLAYERS", head);
         y += 24;
-        var row = new GUIStyle(bodyStyle) { fontSize = 15, wordWrap = false, clipping = TextClipping.Clip };
+        var row = St(bodyStyle, fontSize: 15, wordWrap: false, clipping: TextClipping.Clip);
         var view = new Rect(r.x, y, r.width, r.yMax - y - 40);
         var content = new Rect(0, 0, r.width - 20, Mathf.Max(view.height, games.Count * 44));
         gamesScroll = GUI.BeginScrollView(view, gamesScroll, content);
@@ -348,8 +348,8 @@ public partial class GameUI
         // Your career.
         float y = r.y + 54;
         Fill(new Rect(r.x, y, r.width, 64), new Color(1f, 1f, 1f, 0.05f));
-        var big = new GUIStyle(h3Style) { fontSize = 22, alignment = TextAnchor.MiddleCenter };
-        var cap = new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter };
+        var big = St(h3Style, fontSize: 22, alignment: TextAnchor.MiddleCenter);
+        var cap = St(smallStyle, alignment: TextAnchor.MiddleCenter);
         var stats = new[] { ("WINS", Career.Wins.ToString()), ("K/D", Career.KD.ToString("0.00")), ("KILLS", Career.Kills.ToString()), ("DEATHS", Career.Deaths.ToString()), ("MATCHES", Career.Matches.ToString()) };
         float cw = r.width / stats.Length;
         for (int i = 0; i < stats.Length; i++)
@@ -367,7 +367,7 @@ public partial class GameUI
         GUI.Label(new Rect(r.x + r.width - 180, y, 70, 20), "K/D", head);
         GUI.Label(new Rect(r.x + r.width - 100, y, 90, 20), "KILLS", head);
         y += 24;
-        var row = new GUIStyle(bodyStyle) { fontSize = 15, wordWrap = false, clipping = TextClipping.Clip };
+        var row = St(bodyStyle, fontSize: 15, wordWrap: false, clipping: TextClipping.Clip);
         var view = new Rect(r.x, y, r.width, r.yMax - y - 34);
         var content = new Rect(0, 0, r.width - 20, Mathf.Max(view.height, top.Count * 30));
         topScroll = GUI.BeginScrollView(view, topScroll, content);

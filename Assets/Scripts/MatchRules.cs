@@ -60,6 +60,7 @@ public partial class MatchRules : MonoBehaviour
         LobbyOpen = false;
         IsMatchOver = false;
         Medals.Reset();
+        SyncLobbyBots();
         FpsPlayer announcer = null;
         var players = new List<FpsPlayer>();
         foreach (var p in FpsPlayer.All) if (p.IsSpawned) players.Add(p);
@@ -75,6 +76,34 @@ public partial class MatchRules : MonoBehaviour
         WeaponSpawner.ResetForNewMatch();
         if (announcer != null) announcer.BroadcastMatchState(default);
         Debug.Log("[FFA] Match started");
+    }
+
+    /// <summary>
+    /// Server, match start: bring the number of bots to what the host picked in the lobby (0-8) at its difficulty.
+    /// Practice matches manage their own bots.
+    /// </summary>
+    static void SyncLobbyBots()
+    {
+        if (GameUI.Practice) return;
+        DevSettings.BotAccuracy = GameUI.DifficultyAccuracy[Mathf.Clamp(GameSettings.LobbyBotDifficulty, 0, 2)];
+        var bots = new List<FpsPlayer>();
+        foreach (var p in FpsPlayer.All) if (p.IsSpawned && p.IsBot.Value) bots.Add(p);
+        int want = Mathf.Clamp(GameSettings.LobbyBots, 0, 8);
+        for (int i = bots.Count - 1; i >= want; i--) bots[i].NetworkObject.Despawn(true);
+        var used = new HashSet<string>();
+        foreach (var b in bots) used.Add(b.DisplayName);
+        int n = 0;
+        for (int i = bots.Count; i < want; i++)
+        {
+            string name = "Bot";
+            for (; n < GameUI.BotNames.Length * 2; n++)
+            {
+                string candidate = GameUI.BotNames[n % GameUI.BotNames.Length] + (n >= GameUI.BotNames.Length ? " 2" : "");
+                if (used.Add(candidate)) { name = candidate; break; }
+            }
+            FpsPlayer.SpawnBot(BotMode.Fighter, name);
+        }
+        if (want > 0 || bots.Count > 0) Debug.Log($"[FFA] Lobby bots: {want} ({GameUI.Difficulties[Mathf.Clamp(GameSettings.LobbyBotDifficulty, 0, 2)]})");
     }
 
     /// <summary>

@@ -34,7 +34,7 @@ public class Blizzard : MonoBehaviour
     Material sky;
     Color skyTint, skyGround;
     float skyExposure, skySun;
-    static readonly bool forced = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ffablizzard") >= 0; // tests: storm on
+    static readonly bool forced = System.Array.IndexOf(CommandLine.Args, "-ffablizzard") >= 0; // tests: storm on
 
     void BuildGusts()
     {

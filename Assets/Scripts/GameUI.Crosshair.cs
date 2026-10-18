@@ -135,7 +135,7 @@ public partial class GameUI
         Fill(new Rect(pv.x, pv.y + 90, pv.width, 60), new Color(0.55f, 0.5f, 0.42f, 1f));
         Fill(new Rect(pv.x + 20, pv.y + 40, 40, 70), new Color(0.75f, 0.73f, 0.7f, 1f));
         DrawCrosshair(pv.center.x, pv.center.y, 6f, 1f);
-        GUI.Label(new Rect(pv.x, pv.yMax + 4, pv.width, 20), "PREVIEW", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleCenter });
+        GUI.Label(new Rect(pv.x, pv.yMax + 4, pv.width, 20), "PREVIEW", St(smallStyle, alignment: TextAnchor.MiddleCenter));
         // Team color swatches for the colorblind setting.
         float sy = pv.yMax + 34;
         foreach (var (name, col) in new[] { ("RED TEAM", MatchRules.TeamColorRaw(MatchRules.TeamRed)), ("BLUE TEAM", MatchRules.TeamColorRaw(MatchRules.TeamBlue)), ("INFECTED", MatchRules.InfectedColorRaw) })

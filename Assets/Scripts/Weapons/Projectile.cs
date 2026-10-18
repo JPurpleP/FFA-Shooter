@@ -98,8 +98,7 @@ public class Projectile : NetworkBehaviour
             case ProjectileKind.Molotov:
                 WeaponModel.Build(def.Id, visual);
                 // Burning rag.
-                var rag = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                DestroyImmediate(rag.GetComponent<Collider>());
+                var rag = Prims.Make(PrimitiveType.Quad);
                 rag.transform.SetParent(visual, false);
                 rag.transform.localPosition = new Vector3(0f, 0.17f, 0f);
                 rag.transform.localScale = Vector3.one * 0.22f;
@@ -127,8 +126,7 @@ public class Projectile : NetworkBehaviour
                     b.Box(null, "Fin", new Vector3(0f, 0f, -0.24f), new Vector3(0.12f, 0.004f, 0.06f), a.gunMetal, new Vector3(0f, 0f, i * 45f));
                 Trail(0.18f, 2.5f, 0.6f);
                 // Motor flame and glow.
-                var flame = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                DestroyImmediate(flame.GetComponent<Collider>());
+                var flame = Prims.Make(PrimitiveType.Quad);
                 flame.transform.SetParent(visual, false);
                 flame.transform.localPosition = new Vector3(0f, 0f, -0.32f);
                 flame.transform.localScale = Vector3.one * 0.35f;

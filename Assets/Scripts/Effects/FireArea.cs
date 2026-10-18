@@ -9,7 +9,7 @@ using UnityEngine;
 public class FireArea : MonoBehaviour
 {
     const float Tick = 0.25f;
-    static readonly bool logHits = System.Environment.GetCommandLineArgs().Contains("-ffalogfire"); // tests
+    static readonly bool logHits = CommandLine.Args.Contains("-ffalogfire"); // tests
 
     FpsPlayer owner;
     bool server;

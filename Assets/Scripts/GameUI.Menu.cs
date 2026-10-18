@@ -39,7 +39,7 @@ public partial class GameUI
         h3Style = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, normal = { textColor = new Color(1f, 1f, 1f, 0.55f) } };
         bodyStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true, richText = true, normal = { textColor = new Color(1f, 1f, 1f, 0.85f) } };
-        valueStyle = new GUIStyle(bodyStyle) { alignment = TextAnchor.MiddleRight, fontStyle = FontStyle.Bold };
+        valueStyle = St(bodyStyle, alignment: TextAnchor.MiddleRight, fontStyle: FontStyle.Bold);
 
         navStyle = new GUIStyle(GUI.skin.button)
         {
@@ -66,10 +66,10 @@ public partial class GameUI
             hover = { background = texFieldFocus, textColor = Color.white },
             focused = { background = texFieldFocus, textColor = Color.white },
         };
-        skinButtonStyle = new GUIStyle(navStyle) { fontSize = 17, padding = new RectOffset(64, 10, 0, 0) };
-        skinButtonActiveStyle = new GUIStyle(navActiveStyle) { fontSize = 17, padding = new RectOffset(64, 10, 0, 0) };
-        mapButtonStyle = new GUIStyle(navStyle) { fontSize = 13, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(4, 4, 0, 0) };
-        mapButtonActiveStyle = new GUIStyle(navActiveStyle) { fontSize = 13, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(4, 4, 0, 0) };
+        skinButtonStyle = St(navStyle, fontSize: 17, padding: new RectOffset(64, 10, 0, 0));
+        skinButtonActiveStyle = St(navActiveStyle, fontSize: 17, padding: new RectOffset(64, 10, 0, 0));
+        mapButtonStyle = St(navStyle, fontSize: 13, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(4, 4, 0, 0));
+        mapButtonActiveStyle = St(navActiveStyle, fontSize: 13, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(4, 4, 0, 0));
     }
 
     void DrawMainMenu(float w, float h)
@@ -83,7 +83,7 @@ public partial class GameUI
         Fill(new Rect(0, 0, 400, h), new Color(0.03f, 0.04f, 0.06f, 0.88f));
         Fill(new Rect(400, 0, 2, h), new Color(Accent.r, Accent.g, Accent.b, 0.7f));
 
-        GUI.Label(new Rect(46, 56, 350, 60), "FFA SHOOTER", titleStyle);
+        GUI.Label(new Rect(46, 56, 350, 60), "FLUKETOWN DM", titleStyle);
         GUI.Label(new Rect(50, 116, 340, 24), $"{MapCatalog.NameOf(MapCatalog.Current).ToUpper()}  ·  FREE FOR ALL", subtitleStyle);
 
         float y = 196;
@@ -93,11 +93,13 @@ public partial class GameUI
         Nav(ref y, "LEADERBOARD", MenuTab.Leaderboard);
         Nav(ref y, "CUSTOMIZE", MenuTab.Customize);
         Nav(ref y, "SETTINGS", MenuTab.Settings);
-        if (GUI.Button(new Rect(48, y, 304, 52), "QUIT", navStyle)) QuitGame();
+#if !UNITY_WEBGL
+        if (GUI.Button(new Rect(48, y, 304, 52), "QUIT", navStyle)) QuitGame(); // browsers close the tab instead
+#endif
 
         GUI.Label(new Rect(50, h - 96, 330, 80),
             "Settings > Keybindings (or Esc > Options in game) to change keys" + (DevPanel.Enabled ? " · F1 dev panel" : ""),
-            new GUIStyle(smallStyle) { fontStyle = FontStyle.Normal, wordWrap = true });
+            St(smallStyle, fontStyle: FontStyle.Normal, wordWrap: true));
 
         var panel = new Rect(450, 84, Mathf.Min(w - 500, 780), h - 160);
         Fill(panel, new Color(0.04f, 0.05f, 0.07f, 0.86f));
@@ -112,7 +114,7 @@ public partial class GameUI
             case MenuTab.Customize: DrawCustomizeTab(inner); break;
             case MenuTab.Settings: DrawSettingsTab(inner); break;
         }
-        GUI.Label(new Rect(w - 260, h - 30, 250, 22), $"PUBLIC BETA  ·  v{Application.version}", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleRight });
+        GUI.Label(new Rect(w - 260, h - 30, 250, 22), $"PUBLIC BETA  ·  v{Application.version}", St(smallStyle, alignment: TextAnchor.MiddleRight));
 
         // A newer beta is out: say so above the panel, with a download button.
         if (UpdateCheck.NewerVersion != "")
@@ -148,7 +150,7 @@ public partial class GameUI
         }
         float mw = Mathf.Min(r.width, 420);
         if (GUI.Button(new Rect(r.x, y + 22, 44, 36), "<", mapButtonStyle)) PickMap(shownMap - 1);
-        GUI.Label(new Rect(r.x + 48, y + 22, mw - 96, 36), MapCatalog.NameOf(shownMap).ToUpper(), new GUIStyle(mapButtonActiveStyle) { fontSize = 15 });
+        GUI.Label(new Rect(r.x + 48, y + 22, mw - 96, 36), MapCatalog.NameOf(shownMap).ToUpper(), St(mapButtonActiveStyle, fontSize: 15));
         if (GUI.Button(new Rect(r.x + mw - 44, y + 22, 44, 36), ">", mapButtonStyle)) PickMap(shownMap + 1);
         y += 74;
 
@@ -217,7 +219,7 @@ public partial class GameUI
             MapCatalog.Apply(GameSettings.Map);
         }
         if (GUI.Button(new Rect(hostRect.x + 18, hostRect.y + 132, 44, 36), "<", mapButtonStyle)) PickMap(shownMap - 1);
-        GUI.Label(new Rect(hostRect.x + 66, hostRect.y + 132, col - 36 - 96, 36), MapCatalog.NameOf(shownMap).ToUpper(), new GUIStyle(mapButtonActiveStyle) { fontSize = 15 });
+        GUI.Label(new Rect(hostRect.x + 66, hostRect.y + 132, col - 36 - 96, 36), MapCatalog.NameOf(shownMap).ToUpper(), St(mapButtonActiveStyle, fontSize: 15));
         if (GUI.Button(new Rect(hostRect.x + col - 62, hostRect.y + 132, 44, 36), ">", mapButtonStyle)) PickMap(shownMap + 1);
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 170, col - 36, 22), MapCatalog.DescriptionOf(GameSettings.Map), smallStyle);
         GUI.Label(new Rect(hostRect.x + 18, hostRect.y + 198, 200, 20), "VISIBILITY", smallStyle);
@@ -240,7 +242,7 @@ public partial class GameUI
         GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 14, col - 36, 26), "JOIN A GAME", h3Style);
         GUI.Label(new Rect(joinRect.x + 18, joinRect.y + 46, 200, 20), "JOIN CODE", smallStyle);
         var codeRect = new Rect(joinRect.x + 18, joinRect.y + 68, col - 36, 52);
-        var codeStyle = new GUIStyle(fieldStyle) { fontSize = 28, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        var codeStyle = St(fieldStyle, fontSize: 28, fontStyle: FontStyle.Bold, alignment: TextAnchor.MiddleCenter);
         // Enter joins (checked before the text field eats the key).
         bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
                      && GUI.GetNameOfFocusedControl() == "JoinCode";
@@ -295,15 +297,15 @@ public partial class GameUI
 
         GUI.Label(new Rect(x, y, iw, 40), "LOBBY", h2Style);
         GUI.Label(new Rect(x, y + 6, iw, 30), $"{MapCatalog.NameOf(MapCatalog.Current).ToUpper()}  ·  FIRST TO {MatchRules.FragLimit}",
-            new GUIStyle(subtitleStyle) { alignment = TextAnchor.MiddleRight });
+            St(subtitleStyle, alignment: TextAnchor.MiddleRight));
         y += 50;
 
         // Join code for inviting friends (online games).
         if (RelayConnect.Code != "")
         {
-            GUI.Label(new Rect(x, y, 140, 34), "JOIN CODE", new GUIStyle(smallStyle) { alignment = TextAnchor.MiddleLeft });
-            GUI.Label(new Rect(x + 96, y - 2, 160, 38), $"<b>{RelayConnect.Code}</b>", new GUIStyle(h3Style) { fontSize = 26, richText = true });
-            var copyStyle = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 14 };
+            GUI.Label(new Rect(x, y, 140, 34), "JOIN CODE", St(smallStyle, alignment: TextAnchor.MiddleLeft));
+            GUI.Label(new Rect(x + 96, y - 2, 160, 38), $"<b>{RelayConnect.Code}</b>", St(h3Style, fontSize: 26, richText: true));
+            var copyStyle = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 14);
             if (GUI.Button(new Rect(x + 250, y, 110, 34), Time.unscaledTime - lobbyCodeCopiedTime < 1.5f ? "COPIED!" : "COPY", copyStyle))
             {
                 GUIUtility.systemCopyBuffer = RelayConnect.Code;
@@ -323,8 +325,8 @@ public partial class GameUI
         {
             var modeLabels = new[] { "FFA", "TEAM DM", "GUN GAME", "1 BULLET", "INFECTION" };
             float mbw = (iw - 130 - 4 * 6) / 5f;
-            var modeStyle = new GUIStyle(mapButtonStyle) { fontSize = 11 };
-            var modeActive = new GUIStyle(mapButtonActiveStyle) { fontSize = 11 };
+            var modeStyle = St(mapButtonStyle, fontSize: 11);
+            var modeActive = St(mapButtonActiveStyle, fontSize: 11);
             for (int i = 0; i < 5; i++)
             {
                 var m = MatchRules.Modes[i];
@@ -362,6 +364,27 @@ public partial class GameUI
         y += 34;
         }
 
+        // Bots (host): 0-8 join when the match starts, with a difficulty slider underneath.
+        if (isHost)
+        {
+            GUI.Label(new Rect(x, y, 200, 20), "BOTS", smallStyle);
+            int bots = Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(x + 130, y + 6, iw - 210, 20), GameSettings.LobbyBots, 0f, 8f));
+            GUI.Label(new Rect(x + iw - 70, y - 4, 70, 28), bots == 0 ? "OFF" : $"{bots}", valueStyle);
+            y += 30;
+            GUI.enabled = bots > 0;
+            GUI.Label(new Rect(x, y, 200, 20), "BOT DIFFICULTY", smallStyle);
+            int diff = Mathf.RoundToInt(GUI.HorizontalSlider(new Rect(x + 130, y + 6, iw - 210, 20), GameSettings.LobbyBotDifficulty, 0f, 2f));
+            GUI.Label(new Rect(x + iw - 70, y - 4, 70, 28), GameUI.Difficulties[diff], St(valueStyle, fontSize: 14));
+            GUI.enabled = true;
+            y += 34;
+            if (bots != GameSettings.LobbyBots || diff != GameSettings.LobbyBotDifficulty)
+            {
+                GameSettings.LobbyBots = bots;
+                GameSettings.LobbyBotDifficulty = diff;
+                GameSettings.Save();
+            }
+        }
+
         // Map vote after each match (host toggle).
         if (isHost)
         {
@@ -379,8 +402,8 @@ public partial class GameUI
         {
             GUI.Label(new Rect(x, y + 10, 120, 20), "MAP", smallStyle);
             float mw = (iw - 130 - 6 * (MapCatalog.Count - 1)) / MapCatalog.Count;
-            var mapStyle = new GUIStyle(mapButtonStyle) { fontSize = 11 };
-            var mapActive = new GUIStyle(mapButtonActiveStyle) { fontSize = 11 };
+            var mapStyle = St(mapButtonStyle, fontSize: 11);
+            var mapActive = St(mapButtonActiveStyle, fontSize: 11);
             for (int i = 0; i < MapCatalog.Count; i++)
                 if (GUI.Button(new Rect(x + 130 + i * (mw + 6), y + 2, mw, 34), MapCatalog.NameOf(i).ToUpper(),
                         MapCatalog.Current == i ? mapActive : mapStyle) && MapCatalog.Current != i)
@@ -396,8 +419,8 @@ public partial class GameUI
         GUI.Label(new Rect(x, y, 300, 20), $"PLAYERS ({FpsPlayer.All.Count})", smallStyle);
         y += 26;
         float listBottom = panel.yMax - 110;
-        var nameStyle = new GUIStyle(bodyStyle) { fontSize = 17, wordWrap = false, clipping = TextClipping.Clip };
-        var stateStyle = new GUIStyle(bodyStyle) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+        var nameStyle = St(bodyStyle, fontSize: 17, wordWrap: false, clipping: TextClipping.Clip);
+        var stateStyle = St(bodyStyle, fontSize: 15, fontStyle: FontStyle.Bold, alignment: TextAnchor.MiddleRight);
         foreach (var p in FpsPlayer.All)
         {
             if (y + 34 > listBottom) { GUI.Label(new Rect(x, y, iw, 24), "…", bodyStyle); break; }
@@ -445,7 +468,7 @@ public partial class GameUI
             GUI.enabled = true;
             GUI.Label(new Rect(x, by - 26, iw, 22), "The host starts the match once everyone is ready.", smallStyle);
         }
-        var leaveStyle = new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 };
+        var leaveStyle = St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 17);
         if (GUI.Button(new Rect(x + bw + 16, by, iw - bw - 16, 54), isHost ? "END GAME" : "LEAVE", leaveStyle))
             Disconnect();
     }
@@ -562,8 +585,8 @@ public partial class GameUI
 
     void DrawKeybindings(Rect r)
     {
-        var rowName = new GUIStyle(bodyStyle) { fontSize = 15, alignment = TextAnchor.MiddleLeft, wordWrap = false };
-        var keyStyle = new GUIStyle(mapButtonStyle) { fontSize = 14 };
+        var rowName = St(bodyStyle, fontSize: 15, alignment: TextAnchor.MiddleLeft, wordWrap: false);
+        var keyStyle = St(mapButtonStyle, fontSize: 14);
         float rowH = 38, listH = r.height - 60;
         var view = new Rect(r.x, r.y, r.width, listH);
         var content = new Rect(0, 0, r.width - 20, Bindings.All.Length * rowH);
@@ -581,7 +604,7 @@ public partial class GameUI
         GUI.EndScrollView();
         float by = r.yMax - 46;
         GUI.Label(new Rect(r.x, by, r.width - 230, 40), rebinding >= 0 ? "Press the new key (Esc cancels). A key already in use swaps over." : "Click a key to change it.", smallStyle);
-        if (GUI.Button(new Rect(r.xMax - 210, by, 210, 40), "RESET KEYS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 15 }))
+        if (GUI.Button(new Rect(r.xMax - 210, by, 210, 40), "RESET KEYS", St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 15)))
         {
             Bindings.ResetDefaults();
             rebinding = -1;
@@ -638,7 +661,7 @@ public partial class GameUI
             }
         y += 76;
         if (changed) GameSettings.Save();
-        if (GUI.Button(new Rect(r.x, y + 4, 300, 44), "RESET TO DEFAULTS", new GUIStyle(navStyle) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), fontSize = 17 }))
+        if (GUI.Button(new Rect(r.x, y + 4, 300, 44), "RESET TO DEFAULTS", St(navStyle, alignment: TextAnchor.MiddleCenter, padding: new RectOffset(0, 0, 0, 0), fontSize: 17)))
             GameSettings.ResetToDefaults();
     }
 

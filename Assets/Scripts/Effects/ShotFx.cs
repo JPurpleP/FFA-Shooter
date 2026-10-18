@@ -90,8 +90,7 @@ public static class ShotFx
 
     static void FlashQuad(Transform parent, int layer, Vector3 localPos, Quaternion localRot, Vector3 scale, Color tint)
     {
-        var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        UnityEngine.Object.DestroyImmediate(q.GetComponent<Collider>());
+        var q = Prims.Make(PrimitiveType.Quad);
         q.layer = layer;
         q.transform.SetParent(parent, false);
         q.transform.localPosition = localPos;

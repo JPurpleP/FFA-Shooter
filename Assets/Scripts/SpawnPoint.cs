@@ -18,7 +18,7 @@ public class SpawnPoint : MonoBehaviour
             return;
         }
 
-        var players = FindObjectsByType<FpsPlayer>();
+        var players = FpsPlayer.All; // (not FindObjectsByType: that searches the whole scene, slow in browsers)
         // Score each spawn by its distance to the nearest living enemy, then pick randomly among the best few.
         var scored = new List<(SpawnPoint point, float score)>();
         foreach (var sp in all)

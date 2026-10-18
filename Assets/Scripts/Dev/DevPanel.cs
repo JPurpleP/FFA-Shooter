@@ -17,7 +17,7 @@ public class DevPanel : MonoBehaviour
 {
     public static bool Open { get; private set; }
     /// <summary>F1 panel (god mode, give weapons, bots...) only in the editor, development builds or with -ffadev.</summary>
-    public static bool Enabled => Application.isEditor || Debug.isDebugBuild || System.Environment.GetCommandLineArgs().Contains("-ffadev");
+    public static bool Enabled => Application.isEditor || Debug.isDebugBuild || CommandLine.Args.Contains("-ffadev");
 
     Vector2 scroll;
     int goreWeapon = (int)WeaponId.BarrettM82;
@@ -37,7 +37,7 @@ public class DevPanel : MonoBehaviour
 
     IEnumerator Start()
     {
-        var args = Environment.GetCommandLineArgs();
+        var args = CommandLine.Args;
         string Arg(string flag, int offset = 1) { int i = Array.IndexOf(args, flag); return i >= 0 && i + offset < args.Length ? args[i + offset] : null; }
 
         // Wait until we're in a session with a local player.

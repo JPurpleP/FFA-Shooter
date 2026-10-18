@@ -61,7 +61,7 @@ public class MapCatalog : MonoBehaviour
     /// </summary>
     static void Tidy(GameObject root)
     {
-        if (root == null || !tidied.Add(root) || System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ffanotidy") >= 0) return;
+        if (root == null || !tidied.Add(root) || System.Array.IndexOf(CommandLine.Args, "-ffanotidy") >= 0) return;
         int probesOff = 0, shadowsOff = 0;
         foreach (var r in root.GetComponentsInChildren<Renderer>(true))
         {

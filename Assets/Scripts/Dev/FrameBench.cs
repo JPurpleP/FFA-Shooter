@@ -16,6 +16,8 @@ public class FrameBench : MonoBehaviour
     long batchSum, setPassSum, triSum, gcSum;
     int samples;
     bool disabledTypes;
+    int hitchLog;
+    float nextGcLog;
     int spikeLogs;
     // Development builds: every profiler marker, to find what the frame is spent on.
     readonly List<(string name, ProfilerRecorder rec)> markers = new();
@@ -33,7 +35,7 @@ public class FrameBench : MonoBehaviour
 
     void Start()
     {
-        start = Time.unscaledTime + 4f;
+        start = float.MaxValue; // set once the local player is in the game (loading doesn't count)
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = -1;
         batches = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Batches Count");
@@ -47,6 +49,7 @@ public class FrameBench : MonoBehaviour
     {
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = -1;
+        if (start == float.MaxValue && FpsPlayer.Local != null && !FpsPlayer.Local.InLobby.Value) start = Time.unscaledTime + 4f;
         if (Time.unscaledTime < start) return;
         if (Debug.isDebugBuild && markers.Count == 0)
         {
@@ -65,7 +68,7 @@ public class FrameBench : MonoBehaviour
         {
             // -ffabenchoff Type,Type: switch those scripts off to see what they cost.
             disabledTypes = true;
-            var args = System.Environment.GetCommandLineArgs();
+            var args = CommandLine.Args;
             int ai = System.Array.IndexOf(args, "-ffabenchoff");
             if (ai >= 0 && ai + 1 < args.Length)
             {
@@ -83,6 +86,8 @@ public class FrameBench : MonoBehaviour
             Debug.Log(sb.ToString());
         }
         frames.Add(Time.unscaledDeltaTime);
+        if (Time.unscaledTime > nextGcLog) { nextGcLog = Time.unscaledTime + 5f; Debug.Log($"[FFA] GC count {System.GC.CollectionCount(0)} heapMB={System.GC.GetTotalMemory(false) / 1048576} at t={Time.unscaledTime:0.0}"); }
+        if (Time.unscaledDeltaTime > 0.05f && hitchLog < 25) { hitchLog++; Debug.Log($"[FFA] Hitch {Time.unscaledDeltaTime * 1000f:0} ms at t={Time.unscaledTime:0.00} gc={System.GC.CollectionCount(0)} heapMB={System.GC.GetTotalMemory(false) / 1048576}"); }
         if (Time.unscaledDeltaTime > 0.025f && spikeLogs < 6 && markers.Count > 0)
         {
             spikeLogs++;

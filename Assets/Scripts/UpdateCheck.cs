@@ -19,7 +19,7 @@ public class UpdateCheck : MonoBehaviour
 
     public static void Begin()
     {
-        if (Application.isBatchMode) return;
+        if (Application.isBatchMode || Application.platform == RuntimePlatform.WebGLPlayer) return;
         var go = new GameObject("Update Check");
         DontDestroyOnLoad(go);
         go.AddComponent<UpdateCheck>();
@@ -74,7 +74,7 @@ public class UpdateCheck : MonoBehaviour
     /// <summary>-ffaversion &lt;v&gt;: pretend to be another version (tests the refusal).</summary>
     static string TestVersion()
     {
-        var args = System.Environment.GetCommandLineArgs();
+        var args = CommandLine.Args;
         int i = System.Array.IndexOf(args, "-ffaversion");
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
     }

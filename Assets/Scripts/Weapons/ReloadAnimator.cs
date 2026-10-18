@@ -56,8 +56,7 @@ public class ReloadAnimator
 
         if (left != null)
         {
-            round = GameObject.CreatePrimitive(PrimitiveType.Capsule).transform;
-            Object.DestroyImmediate(round.GetComponent<Collider>());
+            round = Prims.Make(PrimitiveType.Capsule).transform;
             round.name = "Reload Round";
             round.SetParent(model.transform, false);
             var r = round.GetComponent<Renderer>();
@@ -101,8 +100,7 @@ public class ReloadAnimator
         if (grip != null && parts.Count <= 2)
         {
             // Only the floorplate shows on a pistol: give the rig a real magazine body hidden inside the grip.
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
-            Object.DestroyImmediate(body.GetComponent<Collider>());
+            var body = Prims.Make(PrimitiveType.Cube).transform;
             body.name = "MagBody";
             body.SetParent(magRig, false);
             body.localRotation = Quaternion.Inverse(root.rotation) * grip.rotation;

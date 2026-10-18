@@ -46,7 +46,7 @@ public class VoiceChat : MonoBehaviour
         var go = new GameObject("Voice Chat");
         DontDestroyOnLoad(go);
         I = go.AddComponent<VoiceChat>();
-        testTone = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-ffavoicetest") >= 0;
+        testTone = System.Array.IndexOf(CommandLine.Args, "-ffavoicetest") >= 0;
     }
 
     static NetworkManager Net => NetworkManager.Singleton;
@@ -61,7 +61,11 @@ public class VoiceChat : MonoBehaviour
             if (Time.unscaledTime - devicesAt > 3f)
             {
                 devicesAt = Time.unscaledTime;
+#if UNITY_WEBGL
+                devices = new string[0];
+#else
                 devices = Microphone.devices;
+#endif
             }
             return devices;
         }
@@ -100,6 +104,10 @@ public class VoiceChat : MonoBehaviour
         if (mic != null && openedFor == want && Time.unscaledTime < nextMicCheck) return;
         if (mic == null && openedFor == want && Time.unscaledTime < nextMicCheck) return; // failed recently: retry later
         nextMicCheck = Time.unscaledTime + 3f;
+#if UNITY_WEBGL
+        MicError = "Voice chat isn't available in the browser version";
+        return;
+#else
         if (mic != null && openedFor == want && Microphone.IsRecording(device)) return;
         StopMic();
         openedFor = want;
@@ -108,6 +116,7 @@ public class VoiceChat : MonoBehaviour
         if (want.Length > 0 && System.Array.IndexOf(devices, want) < 0) want = "";
         device = want.Length == 0 ? null : want;
         mic = Microphone.Start(device, true, 1, Rate);
+#endif
         readPos = 0;
         pending.Clear();
         MicError = mic == null ? "Couldn't open the microphone" : null;
@@ -116,7 +125,9 @@ public class VoiceChat : MonoBehaviour
     void StopMic()
     {
         if (mic == null) return;
+#if !UNITY_WEBGL
         Microphone.End(device);
+#endif
         Destroy(mic);
         mic = null;
         pending.Clear();
@@ -139,7 +150,11 @@ public class VoiceChat : MonoBehaviour
         }
         else if (mic != null)
         {
+#if UNITY_WEBGL
+            int pos = 0;
+#else
             int pos = Microphone.GetPosition(device);
+#endif
             int len = mic.samples;
             int count = (pos - readPos + len) % len;
             if (count > 0)

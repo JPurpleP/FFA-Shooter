@@ -1,4 +1,6 @@
-# FFA Shooter
+# Fluketown DM
+
+(Formerly "FFA Shooter"; the repo keeps its old name. Settings from the old name carry over on first launch.)
 
 Online first-person shooter with five maps of the same size (180 × 148 m). **Fluketown** is a Nuketown-style suburb
 ringed by more streets and houses. **Timberline** is a summer camp in a forested valley. **Downtown** is a city grid with
@@ -14,7 +16,7 @@ Each map has its own look: a tinted procedural sky, color grading, bloom, vignet
 road puddles, manholes, trash bags) merged into a few batched meshes per map so it costs almost nothing to draw.
 
 ## Play
-- Run `Builds/Windows/FFA-Shooter.exe`. Main menu: **Play** (name, Host with a map choice, Join —
+- Run `Builds/Windows/FluketownDM.exe` (or the browser build in `Builds/WebGL`, see below). Main menu: **Play** (name, Host with a map choice, Join —
   joiners load whatever map the host picked),
   **Customize** (skins with a live 3D preview: Original, Rainbow, Hi-Vis Worker, Tactical, Chef, Clown,
   Banana Suit, Astronaut, Cowboy, Pirate, Alien, Luchador, Tourist,
@@ -185,7 +187,7 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   -ffashots <prefix> <count> <interval>   screenshot series   -ffascreenshot <file>
   -ffamenutab <0-2>  -ffaskin <id>  -ffaskinline [first] [count]   -ffafire   hold the trigger   -ffathrow  cook and throw a grenade   -ffabotgive <id>  arm all bots        -ffatopdown [size] [x] [z]   orthographic map overview, UI hidden
   ```
-- Headless match: `FFA-Shooter.exe -batchmode -nographics -ffahost -ffaautotest -ffabots 5 Fighter -ffaquitafter 60 -logFile host.log`
+- Headless match: `FluketownDM.exe -batchmode -nographics -ffahost -ffaautotest -ffabots 5 Fighter -ffaquitafter 60 -logFile host.log`
   (`[FFA] Kill:` lines show weapon, headshots and gore outcome).
 
 ## Project layout
@@ -209,6 +211,14 @@ already lying nearby. Gore lab (F1) has a "Blast" hit option and a "Test blast a
   builds Timberline (heightmap ground mesh, generated tree/rock meshes, cabins, lookout); `ProjectBuilder.City.cs`
   builds Downtown (metre-scaled facade/brick meshes via `metricTile`, walk-in shops, garage, construction site). Re-run **FFA > Rebuild Arena**
   after changing it (overwrites `Assets/Generated` and the scene). Build: `-executeMethod ProjectBuilder.BuildWindows`.
+
+## Browser build (itch.io)
+- `-executeMethod ProjectBuilder.BuildWebGL` → `Builds/WebGL` (gzip with decompression fallback, so any static host works).
+- Online play runs over secure WebSockets through Unity Relay (desktop uses DTLS; Relay bridges them, so browser and
+  desktop players can share a game). Practice vs bots hosts through Relay in the browser (browsers can't open a local
+  server), so it needs a connection. No voice chat in the browser (no microphone access from Unity WebGL); no ambient
+  occlusion (needs compute shaders); Graphics defaults to Medium.
+- Test flags go in the page address: `index.html?args=-ffapractice%20-ffaautotest` (same flags as the command line).
 
 ## Online setup (one time)
 1. Open the project in Unity 6000.6.5f1 and sign in with your Unity account.
