@@ -8,12 +8,19 @@ using UnityEngine;
 public static class Prims
 {
     static readonly Mesh[] meshes = new Mesh[6];
-    static readonly string[] files = { "Sphere.fbx", "Capsule.fbx", "Cylinder.fbx", "Cube.fbx", "Plane.fbx", "Quad.fbx" };
 
+    /// <summary>
+    /// The exact mesh CreatePrimitive uses, taken from one throwaway primitive per shape. (The built-in "Sphere.fbx" /
+    /// "Capsule.fbx" / "Cylinder.fbx" resources are different, twice-the-size meshes: using them made every body fat.)
+    /// </summary>
     public static Mesh MeshOf(PrimitiveType type)
     {
         int i = (int)type; // Sphere, Capsule, Cylinder, Cube, Plane, Quad
-        return meshes[i] != null ? meshes[i] : meshes[i] = Resources.GetBuiltinResource<Mesh>(files[i]);
+        if (meshes[i] != null) return meshes[i];
+        var probe = GameObject.CreatePrimitive(type);
+        meshes[i] = probe.GetComponent<MeshFilter>().sharedMesh;
+        if (Application.isPlaying) Object.Destroy(probe); else Object.DestroyImmediate(probe);
+        return meshes[i];
     }
 
     public static GameObject Make(PrimitiveType type, string name = null)

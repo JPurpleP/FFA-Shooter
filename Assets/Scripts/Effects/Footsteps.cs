@@ -30,7 +30,7 @@ public class Footsteps : MonoBehaviour
         source.spatialBlend = p.IsLocalHuman ? 0.4f : 1f;
         source.rolloffMode = AudioRolloffMode.Linear;
         source.minDistance = 2f;
-        source.maxDistance = 30f;
+        source.maxDistance = 25f; // steps are a close-range cue
         source.dopplerLevel = 0f;
     }
 

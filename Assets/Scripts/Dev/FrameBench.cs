@@ -173,6 +173,9 @@ public class FrameBench : MonoBehaviour
             if (l.type != LightType.Directional) pointLights++;
             if (lights.Length < 400) lights += $" {l.name}:{l.type}/{l.renderMode}/r{l.range:0}/sh{l.shadows}";
         }
+        int listeners = 0;
+        foreach (var l in Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None)) if (l.isActiveAndEnabled) listeners++;
+        Debug.Log($"[FFA] Census audio listeners active={listeners}");
         Debug.Log($"[FFA] Census lights={pointLights} pixelLights={QualitySettings.pixelLightCount} quality={QualitySettings.names[QualitySettings.GetQualityLevel()]}{lights}");
     }
 

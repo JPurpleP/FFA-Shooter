@@ -45,6 +45,7 @@ public partial class GameUI : MonoBehaviour
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
     static GameUI instance;
+    AudioListener menuListener;
     static float captureTime;
 
     string address = "";
@@ -514,7 +515,13 @@ public partial class GameUI : MonoBehaviour
         var local = FpsPlayer.Local;
         bool inGame = local != null && !local.InLobby.Value;
         if (menuCamera != null)
+        {
             menuCamera.enabled = !inGame;
+            // Its listener too: left on, it heard the whole match from high above the map, so every shot
+            // anywhere sounded the same distance away.
+            if (menuListener == null) menuListener = menuCamera.GetComponent<AudioListener>();
+            if (menuListener != null) menuListener.enabled = !inGame;
+        }
 
         if (local != null && local.InLobby.Value)
         {

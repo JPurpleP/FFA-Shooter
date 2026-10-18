@@ -983,9 +983,11 @@ public static partial class ProjectBuilder
         var audio = root.AddComponent<AudioSource>();
         audio.playOnAwake = false;
         audio.spatialBlend = 1f;
-        audio.minDistance = 6f;
-        audio.maxDistance = 120f;
-        audio.rolloffMode = AudioRolloffMode.Linear;
+        // Natural falloff for gunfire: loud close up, about 10% at 40 m and 5% at 80 m (distant fights stay faintly
+        // audible, as a cue), nothing past 110 m.
+        audio.rolloffMode = AudioRolloffMode.Logarithmic;
+        audio.minDistance = 4f;
+        audio.maxDistance = 110f;
         var player = root.AddComponent<FpsPlayer>();
 
         var head = new GameObject("Head").transform;
