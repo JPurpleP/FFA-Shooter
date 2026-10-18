@@ -41,6 +41,7 @@ public partial class GameUI : MonoBehaviour
     /// <summary>-ffainspect x y z: hold the view model turned by these angles (checking hands for clipping).</summary>
     public static Vector3? InspectEuler { get; private set; }
     public static bool ReloadTest { get; private set; } // -ffareloadtest
+    public static (Vector3 pos, Quaternion rot)? CinematicCam { get; private set; } // -ffacam
     bool wasSummary; // forcePause: -ffapause keeps the Esc menu up (screenshots) // -ffaready / -ffastartwhenready: drive the lobby without clicks (tests)
     public static bool CursorCaptured => Cursor.lockState == CursorLockMode.Locked && Time.unscaledTime > captureTime + 0.15f;
 
@@ -449,6 +450,14 @@ public partial class GameUI : MonoBehaviour
             InspectEuler = new Vector3(ix, iy, iz);
         }
         ReloadTest = args.Contains("-ffareloadtest");
+        if (args.Contains("-ffanohud")) hideUi = true; // screenshots
+        // -ffacam x y z pitch yaw: a fixed cinematic camera during the match (screenshots / trailers)
+        if (Array.IndexOf(args, "-ffacam") is var camArg and >= 0 && camArg + 5 < args.Length)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            float F(int k) => float.Parse(args[camArg + k], System.Globalization.NumberStyles.Float, inv);
+            CinematicCam = (new Vector3(F(1), F(2), F(3)), Quaternion.Euler(F(4), F(5), 0f));
+        }
         if (int.TryParse(Arg("-ffalobbybots"), out int lb)) GameSettings.LobbyBots = Mathf.Clamp(lb, 0, 8); // tests (not saved)
         if (float.TryParse(Arg("-ffafov"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float tf)) GameSettings.Fov = tf; // tests (not saved)
         if (int.TryParse(Arg("-ffagraphics"), out int gfx)) { GameSettings.Graphics = Mathf.Clamp(gfx, 0, 2); GraphicsQuality.Apply(); }

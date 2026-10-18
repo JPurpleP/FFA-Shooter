@@ -318,7 +318,6 @@ public class FpsPlayer : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        gameObject.AddComponent<Footsteps>().Init(this);
         if (!IsServer) MapCatalog.Apply(MapId.Value);
         // The host can switch maps in the lobby: follow it.
         MapId.OnValueChanged += (_, map) =>
@@ -439,6 +438,12 @@ public class FpsPlayer : NetworkBehaviour
     void LateUpdate()
     {
         if (!IsSpawned || !IsLocalHuman) return;
+        if (GameUI.CinematicCam is { } shot)
+        {
+            playerCamera.transform.SetPositionAndRotation(shot.pos, shot.rot);
+            viewModelCamera.enabled = false;
+            return;
+        }
         // Out of lives: watch the players still in it (Spectator: their eyes or a chase camera).
         if (IsDead && Eliminated.Value && Time.time - eliminatedSince > 3f && !KillCam.Active && Spectator.Drive(this))
         {

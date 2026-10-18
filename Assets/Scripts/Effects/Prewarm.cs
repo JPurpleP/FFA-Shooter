@@ -104,7 +104,6 @@ public class Prewarm : MonoBehaviour
         yield return null;
         foreach (Medal m in System.Enum.GetValues(typeof(Medal))) { Medals.Sting(m); made++; }
         yield return null;
-        foreach (Footsteps.Surface s in System.Enum.GetValues(typeof(Footsteps.Surface))) { Footsteps.Clips(s); made += 3; yield return null; }
         Debug.Log($"[FFA] Prewarmed {made} sounds in {(Time.realtimeSinceStartup - t0) * 1000f:0} ms");
         if (GraphicsQuality.Web) yield return WarmShaders();
         Done = true;
