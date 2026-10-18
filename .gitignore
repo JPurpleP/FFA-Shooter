@@ -45,3 +45,6 @@ crashlytics-build.properties
 /Assets/Scenes/Arena.unity
 /Assets/Generated/
 /Assets/Generated.meta
+
+# Burst output from WebGL builds
+/Data/
